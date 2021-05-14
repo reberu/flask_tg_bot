@@ -123,3 +123,11 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+settings.py
+
+parse.py
+price.json
+db_connector.py
+db.py
+data.py
+answer.json
