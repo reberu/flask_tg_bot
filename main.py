@@ -8,7 +8,7 @@ from settings import BOT_TOKEN
 from flask import Flask
 from flask import request
 
-from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 
 import keyboards
 
@@ -24,8 +24,11 @@ def write_json(data, filename='answer.json'):
 
 
 def parse_text(text):
-    pattern = r'(^Рестораны$)|(^Корзина$)|(^Оформить заказ$)|(\/\w+)|(\w+_[0-9]+$)'
-    value = re.search(pattern, text).group()
+    pattern = r'(^Рестораны$)|(^Корзина$)|(^Оформить заказ$)|(\/\w+)|(\w+_[0-9]+$)|(^Статистика$)'
+    try:
+        value = re.search(pattern, text).group()
+    except AttributeError:
+        return None
     return value
 
 
@@ -48,30 +51,156 @@ def index():
     if request.method == 'POST':
         r = request.get_json()
         write_json(json.loads(json.dumps(r)))
+
         if get_value("callback_query", r):
             # write callback handlers
             print('callback!')
             data = r['callback_query']['data']
-            print(data)
+            buttons = []
             chat_id = r['callback_query']['message']['chat']['id']
             message_id = r['callback_query']['message']['message_id']
-            rest_id = int(data.split('_')[1])
-            categories_sql = "SELECT id, name FROM categories WHERE restaurant_id = ?"
-            categories = sql_query(categories_sql, rest_id)
-            buttons = []
-            for category in categories:
+            if re.search(r'restaurant_[0-9]+$', data):
+                print(data)
+                rest_id = int(data.split('_')[1])
+                categories_sql = "SELECT id, name FROM categories WHERE restaurant_id = ?"
+                categories = sql_query(categories_sql, rest_id)
+                for category in categories:
+                    buttons.append(
+                        [InlineKeyboardButton(category[1], callback_data=f'restaurant_{rest_id}_cat{category[0]}')])
                 buttons.append(
-                    [InlineKeyboardButton(category[1], callback_data=f'restaurant_{rest_id}_cat{category[0]}')])
-            buttons.append(
-                [InlineKeyboardButton('Узнать время доставки',
-                                      callback_data=f'restaurant_{rest_id}_deliverytime')])
-            buttons.append([InlineKeyboardButton('Назад', callback_data='back')])
-            BOT.editMessageText(
-                text='Пожалуйста выберите подходящую категорию',
-                chat_id=chat_id,
-                message_id=message_id,
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
+                    [InlineKeyboardButton('Узнать время доставки',
+                                          callback_data=f'restaurant_{rest_id}_deliverytime')])
+                buttons.append([InlineKeyboardButton('Назад', callback_data='back')])
+                BOT.editMessageText(
+                    text='Пожалуйста выберите подходящую категорию',
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    reply_markup=InlineKeyboardMarkup(buttons)
+                )
+            elif re.search(r'(restaurant_[0-9]+_cat[0-9]+$)|'
+                           r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_forward$)|'
+                           r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_backward$)|'
+                           r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_add$)', data):
+                rest_id, cat_id = int(data.split('_')[1]), int(data.split('_')[2][3:])
+                cat_sql = "SELECT name FROM categories WHERE id = ?"
+                category = sql_query(cat_sql, cat_id)[0][0]
+                rest_name = sql_query("SELECT name FROM restaurants WHERE id = ?;", rest_id)[0][0]
+                dishes_sql = """
+                        SELECT name, cost, description, composition, img_link, id, category 
+                        FROM dishes WHERE id_rest = ? and category = ?;
+                    """
+                sql_result = sql_query(dishes_sql, rest_id, category)
+                text = f'{rest_name}\n'
+                current_id = 1
+                # Логика прокрутки назад-вперед
+                if len(data.split('_')) == 6:
+                    if '_backward' in data:
+                        temp = int(data.split('_')[4])
+                        if temp > 1:
+                            current_id = temp - 1
+                            print('backward event')
+                    elif '_forward' in data:
+                        temp = int(data.split('_')[4])
+                        if temp < len(sql_result):
+                            current_id = temp + 1
+                            print('forward event')
+                else:
+                    current_id = 1
+
+                if len(data.split('_')) == 6 and '_add' in data:
+                    print('add event')
+                    add_query = "INSERT INTO cart(' \
+                                    'name, price, quantity, user_uid, is_dish, is_water, dish_id, restaurant_id') ' \
+                                    'VALUES(?, ?, ?, ?, ?, ?, ?, ?);"
+                    print(sql_result[current_id - 1][0], sql_result[current_id - 1][1], 1,
+                          chat_id, 1, 0, data.split('_')[4], data.split('_')[1])
+                    sql_query(add_query, sql_result[current_id - 1][0], sql_result[current_id - 1][1], 1,
+                              chat_id, 1, 0, data.split('_')[4], data.split('_')[1])
+
+                # Логика добавления и убавления товаров
+                # if 'add' in data.split('_'):
+
+                text += f'<a href="{sql_result[current_id - 1][4]}">.</a>'
+                text += f'\n<b>{sql_result[current_id - 1][0]}</b>'
+                text += f'\nОписание - {sql_result[current_id - 1][2]}'
+                text += f'\nСостав: {sql_result[current_id - 1][3]}'
+                text += f'\nСтоимость - {sql_result[current_id - 1][1]} р.'
+
+                cart_count_sql = "SELECT quantity FROM cart WHERE user_uid = ? and dish_id = ?;"
+                dish_id = sql_result[current_id - 1][5]
+                print(chat_id, dish_id)
+                try:
+                    cart_count = sql_query(cart_count_sql, chat_id, dish_id)[0][0]
+                except TypeError:
+                    cart_count = 0
+                except IndexError:
+                    cart_count = 0
+
+                buttons.append([
+                    # InlineKeyboardButton('⬆️ добавить', callback_data='to_cart'),
+                    InlineKeyboardButton('⬆️ добавить',
+                                         callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{current_id}_add'),
+                    InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
+                    InlineKeyboardButton('⬇️ убавить', callback_data='remove_from_cart')
+                ])
+
+                buttons.append([
+                    InlineKeyboardButton('⬅️',
+                                         callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{current_id}_backward'),
+                    InlineKeyboardButton(f'{current_id}/{len(sql_result)}', callback_data='None'),
+                    InlineKeyboardButton('➡️',
+                                         callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{current_id}_forward')
+                ])
+
+                total = 0
+                total_sql = "SELECT price, quantity FROM cart WHERE user_uid = ?;"
+                total_sql_result = sql_query(total_sql, chat_id)
+                if not total_sql_result:
+                    total = 0
+                else:
+                    for sub in total_sql_result:
+                        total += sub[0] * sub[1]
+                buttons.append([InlineKeyboardButton('Добавить в избранное', callback_data='to_favorites')])
+                buttons.append([InlineKeyboardButton('В категории меню', callback_data=f'rest_{rest_id}')])
+                buttons.append(
+                    [InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='show_cart')])
+                BOT.edit_message_text(
+                    text=text,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    reply_markup=InlineKeyboardMarkup(buttons),
+                    parse_mode=ParseMode.HTML
+                )
+            elif re.search(r'^stat_[0-9]+$', data):
+                stat_id = int(data.split('_')[1])
+                if stat_id == 1:
+                    stat_query = 'SELECT * FROM orders;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Количество заказов в сумме\n{stat_data}')
+                elif stat_id == 2:
+                    stat_query = 'SELECT * FROM orders;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Количество заказов по ресторанам\n{stat_data}')
+                elif stat_id == 3:
+                    stat_query = 'SELECT * FROM orders;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Количество заказов в общем\n{stat_data}')
+                elif stat_id == 4:
+                    stat_query = 'SELECT * FROM orders;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Статистика заказов блюд\n{stat_data}')
+                elif stat_id == 5:
+                    stat_query = 'SELECT * FROM orders;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Количество изменений в заказе\n{stat_data}')
+                elif stat_id == 6:
+                    stat_query = 'SELECT * FROM orders;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Количество отмен заказов\n{stat_data}')
+                elif stat_id == 7:
+                    stat_query = 'SELECT * FROM users;'
+                    stat_data = sql_query(stat_query)
+                    BOT.send_message(chat_id=chat_id, text=f'Количество посещений\n{stat_data}')
         else:
             # write message handlers
             print('message!')
@@ -100,6 +229,8 @@ def index():
                 BOT.send_message(chat_id, 'Вы выбрали корзину')
             elif parse_text(message) == 'Оформить заказ':
                 BOT.send_message(chat_id, 'Вы выбрали оформить заказ')
+            elif parse_text(message) == 'Статистика':
+                BOT.send_message(chat_id=chat_id, text='СТАТИСТИКА', reply_markup=keyboards.stat_menu_keyboard())
 
     return '<h1>From bot you are welcome!</h1>'
 
