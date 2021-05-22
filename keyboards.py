@@ -11,7 +11,7 @@ def rest_menu_keyboard():
     keyboard = []
     for restaurant in restaurants:
         keyboard.append([InlineKeyboardButton(f'{restaurant[1]}', callback_data=f'restaurant_{restaurant[0]}')])
-    keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
+    # keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
     return InlineKeyboardMarkup(keyboard)
 
 
