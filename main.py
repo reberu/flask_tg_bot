@@ -197,6 +197,14 @@ def index():
                         reply_markup=InlineKeyboardMarkup(buttons),
                         parse_mode=ParseMode.HTML
                     )
+
+                elif data == 'to_rest':
+                    BOT.editMessageText(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text='Пожалуйста, выберите ресторан:',
+                        reply_markup=keyboards.rest_menu_keyboard())
+
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
                     if stat_id == 1:
@@ -241,10 +249,11 @@ def index():
 
                     if len(cart) == 0:
                         text = 'Ваша корзина пуста'
-                        buttons = [[InlineKeyboardButton('Назад', callback_data='back')]]
+                        buttons = [[InlineKeyboardButton('Назад', callback_data='to_rest')]]
                         # query.edit_message_text(
-                        BOT.send_message(
+                        BOT.edit_message_text(
                             chat_id=chat_id,
+                            message_id=message_id,
                             text=text,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
@@ -254,23 +263,39 @@ def index():
                         dishes_query = "SELECT id, name, description, composition, img_link FROM dishes;"
                         dishes = sql_query(dishes_query)
                         total = 0
-
+                        current_id = cart[0][0]
                         if re.search(r'(^cart_id_[0-9]+$)', data):
                             current_id = int(data.split('_')[2])
                         elif re.search(r'(^cart_id_[0-9]+_clear$)', data):
+                            current_id = int(data.split('_')[2])
                             clear_query = "DELETE FROM cart WHERE id = ?;"
                             sql_query(clear_query, int(data.split('_')[2]))
+                            cart = sql_query(cart_query, chat_id)
+                            current_id = cart[0][0]
                         elif re.search(r'(^cart_purge$)', data):
                             purge_query = "DELETE FROM cart WHERE user_uid = ?;"
                             sql_query(purge_query, chat_id)
-                        else:
-                            current_id = cart[0][0]
+
+                        elif re.search(r'(^cart_id_[0-9]+_add$)', data):
+                            current_id = int(data.split('_')[2])
+                            for i in cart:
+                                if current_id == i[0]:
+                                    query = "UPDATE cart SET quantity = ?;"
+                                    sql_query(query, i[3]+1)
                         print('show_cart handler')
                         print(cart)
                         try:
-                            print(current_id)
+                            print('current_id', current_id)
                         except UnboundLocalError:
                             print("UnboundLocalError: local variable 'current_id' referenced before assignment")
+                        try:
+                            for i in cart:
+                                if current_id == i[0]:
+                                    cart_count = i[3]
+                            print('cart_count', cart_count)
+                        except UnboundLocalError:
+                            print("UnboundLocalError: local variable 'current_id' referenced before assignment")
+
                         buttons = []
                         if current_id:
                             cart_buttons = [InlineKeyboardButton('❌', callback_data=f'cart_id_{current_id}_clear')]
@@ -294,9 +319,10 @@ def index():
                                 text += f'\nСтоимость - {cart[0][2]}'
                         buttons.append(cart_buttons)
                         buttons.append([
-                            InlineKeyboardButton('⬆️ добавить',
+                            InlineKeyboardButton('⬆️',
                                                  callback_data=f'cart_id_{cart[0][0]}_add'),
-                            InlineKeyboardButton('⬇️ убавить',
+                            InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
+                            InlineKeyboardButton('⬇️',
                                                  callback_data=f'cart_id_{cart[0][0]}_remove')
                         ])
                         buttons.append([
@@ -348,7 +374,7 @@ def index():
 
                     if len(cart) == 0:
                         text = 'Ваша корзина пуста'
-                        buttons = [[InlineKeyboardButton('Назад', callback_data='back')]]
+                        buttons = [[InlineKeyboardButton('Назад', callback_data='to_rest')]]
                         # query.edit_message_text(
                         BOT.send_message(
                             chat_id=chat_id,
@@ -366,6 +392,10 @@ def index():
                         print('show_cart handler')
                         print(cart)
                         print(current_id)
+                        for i in cart:
+                            if current_id == i[0]:
+                                cart_count = i[3]
+
                         buttons = []
                         cart_buttons = [InlineKeyboardButton('❌', callback_data=f'cart_id_{current_id}_clear')]
                         text = '<b>Корзина</b>\n'
@@ -386,9 +416,10 @@ def index():
                                 text += f'\nСтоимость - {cart[0][2]}'
                         buttons.append(cart_buttons)
                         buttons.append([
-                            InlineKeyboardButton('⬆️ добавить',
+                            InlineKeyboardButton('⬆️',
                                                  callback_data=f'cart_id_{cart[0][0]}_add'),
-                            InlineKeyboardButton('⬇️ убавить',
+                            InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
+                            InlineKeyboardButton('⬇️',
                                                  callback_data=f'cart_id_{cart[0][0]}_remove')
                         ])
                         buttons.append([
