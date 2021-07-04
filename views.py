@@ -56,7 +56,8 @@ def index():
                                r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_forward$)|'
                                r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_backward$)|'
                                r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_add$)|'
-                               r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_rem$)', data):
+                               r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_rem$)|'
+                               r'(restaurant_[0-9]+_cat[0-9]+_show_more_[0-9]+$)', data):
                     rest_id, cat_id = int(data.split('_')[1]), int(data.split('_')[2][3:])
                     cat_sql = "SELECT name FROM categories WHERE id = ?"
                     category = sql_query(cat_sql, cat_id)[0][0]
@@ -68,6 +69,29 @@ def index():
                     sql_result = sql_query(dishes_sql, rest_id, category)
                     text = f'{rest_name}\n'
                     current_id = 1
+                    dish_count = len(sql_result)
+
+                    # TODO: finish show_more block
+                    positions = {}
+                    for i, item in enumerate(sql_result, start=1):
+                        positions.update({i: item[5]})
+                    if '_show_more_' not in data:
+                        print('show_more not in data')
+                        dishes_result = sql_result[:5]
+                    elif '_show_more_' in data:
+                        print('show more in data')
+                        value = None
+                        pos = int(data.split('_')[5])
+                        for v, k in positions.items():
+                            if k == pos:
+                                value = v
+                        if pos <= 5 and dish_count >= 10:
+                            dishes_result = sql_result[5:-5]
+                        elif pos <= 5 and dish_count < 10:
+                            dishes_result = sql_result[5:]
+                        elif 10 >= pos > 5:
+                            dishes_result = sql_result[10:]
+
                     # Логика прокрутки назад-вперед
                     if len(data.split('_')) == 6:
                         if data.split('_')[5] == 'backward':
@@ -77,58 +101,61 @@ def index():
                                 print('backward event')
                         elif data.split('_')[5] == 'forward':
                             temp = int(data.split('_')[4])
-                            if temp < len(sql_result):
+                            if temp < len(dishes_result):
                                 current_id = temp + 1
                                 print('forward event')
                         elif data.split('_')[5] == 'add':
                             print('add event')
                             current_id = int(data.split('_')[4])
-                            dish_count = d_count_query(sql_result[current_id - 1][0], chat_id, data.split('_')[1])
+                            dish_count = d_count_query(dishes_result[current_id - 1][0], chat_id, data.split('_')[1])
                             if dish_count and dish_count > 0:
                                 add_query = "UPDATE cart SET quantity = ? " \
                                             "WHERE name = ? and user_uid = ? and restaurant_id = ?;"
-                                sql_query(add_query, dish_count + 1, sql_result[current_id - 1][0], chat_id,
+                                sql_query(add_query, dish_count + 1, dishes_result[current_id - 1][0], chat_id,
                                           data.split('_')[1])
                             else:
                                 print('add new item')
                                 add_query = "INSERT INTO cart('name', 'price', 'quantity', 'user_uid', 'is_dish', " \
                                             "'is_water', 'dish_id', 'restaurant_id') VALUES(?, ?, ?, ?, ?, ?, ?, ?);"
-                                sql_query(add_query, sql_result[current_id - 1][0], sql_result[current_id - 1][1], 1,
+                                sql_query(add_query, dishes_result[current_id - 1][0], dishes_result[current_id - 1][1], 1,
                                           chat_id, 1, 0, data.split('_')[4], data.split('_')[1])
                         elif data.split('_')[5] == 'rem':
                             print('rem event')
                             current_id = int(data.split('_')[4])
-                            dish_count = d_count_query(sql_result[current_id - 1][0], chat_id, data.split('_')[1])
+                            dish_count = d_count_query(dishes_result[current_id - 1][0], chat_id, data.split('_')[1])
                             print(f'dish count {dish_count}, current_id {current_id}')
                             if dish_count and dish_count > 1:
                                 print('UPDATE')
                                 rem_query = "UPDATE cart SET quantity = ? " \
                                             "WHERE name = ? and user_uid = ? and restaurant_id = ?;"
-                                sql_query(rem_query, dish_count - 1, sql_result[current_id - 1][0], chat_id,
+                                sql_query(rem_query, dish_count - 1, dishes_result[current_id - 1][0], chat_id,
                                           data.split('_')[1])
                             elif dish_count and dish_count == 1:
                                 print('DELETE')
                                 rem_query = "DELETE FROM cart WHERE name = ? and user_uid = ? and restaurant_id = ?;"
-                                sql_query(rem_query, sql_result[current_id - 1][0], chat_id, data.split('_')[1])
+                                sql_query(rem_query, dishes_result[current_id - 1][0], chat_id, data.split('_')[1])
                             else:
                                 pass
                     else:
                         pass
 
-                    text += f'<a href="{sql_result[current_id - 1][4]}">.</a>'
-                    text += f'\n<b>{sql_result[current_id - 1][0]}</b>'
-                    text += f'\nОписание - {sql_result[current_id - 1][2]}'
-                    text += f'\nСостав: {sql_result[current_id - 1][3]}'
-                    text += f'\nСтоимость - {sql_result[current_id - 1][1]} р.'
+                    text += f'<a href="{dishes_result[current_id - 1][4]}">.</a>'
+                    text += f'\n<b>{dishes_result[current_id - 1][0]}</b>'
+                    text += f'\nОписание - {dishes_result[current_id - 1][2]}'
+                    text += f'\nСостав: {dishes_result[current_id - 1][3]}'
+                    text += f'\nСтоимость - {dishes_result[current_id - 1][1]} р.'
 
                     cart_count_sql = "SELECT quantity FROM cart WHERE user_uid = ? and dish_id = ?;"
-                    dish_id = sql_result[current_id - 1][5]
+                    dish_id = dishes_result[current_id - 1][5]
                     try:
                         cart_count = sql_query(cart_count_sql, chat_id, dish_id)[0][0]
                     except TypeError:
                         cart_count = 0
                     except IndexError:
                         cart_count = 0
+
+                    # add button to show more items
+                    buttons.append([InlineKeyboardButton('Показать еще', callback_data=f'restaurant_{rest_id}_cat{cat_id}_show_more_{dishes_result[current_id - 1][5]}')])
 
                     buttons.append([
                         InlineKeyboardButton('⬆️',
@@ -141,7 +168,7 @@ def index():
                     buttons.append([
                         InlineKeyboardButton('⬅️',
                                              callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{current_id}_backward'),
-                        InlineKeyboardButton(f'{current_id}/{len(sql_result)}', callback_data='None'),
+                        InlineKeyboardButton(f'{current_id}/{len(dishes_result)}', callback_data='None'),
                         InlineKeyboardButton('➡️',
                                              callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{current_id}_forward')
                     ])
