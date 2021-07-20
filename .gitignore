@@ -131,6 +131,9 @@ db_connector.py
 db.py
 data.py
 answer.json
+data.json
+
+db_.sqlite3
 
 ngrok
 test.py
