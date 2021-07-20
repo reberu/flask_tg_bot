@@ -13,7 +13,7 @@ import json
 from flask import request
 
 from app import app, db
-from models import Restaurant, Category, Dish, Cart, User
+from models import Restaurant, Category, Dish, Cart, User, Order
 
 BOT = Bot(BOT_TOKEN)
 URL = f'https://api.telegram.org/bot{BOT_TOKEN}/'
@@ -76,9 +76,6 @@ def index():
                             if item.id == dish_id:
                                 dish_name = item.name
                                 cur_id = i
-                        # dish_count = d_count_query(dish_name, cur_chat_id, data.split('_')[1])
-                        # dish_count_query = "SELECT quantity FROM cart " \
-                        #                    "WHERE name = ? and user_uid = ? and restaurant_id = ?;"
                         print(dish_name, cur_chat_id, data.split('_')[1])
                         try:
                             dish_count = db.session.query(Cart.quantity).filter_by(name=dish_name, user_uid=cur_chat_id, restaurant_id=data.split('_')[1]).first()[0]
@@ -208,11 +205,6 @@ def index():
                                r'(^cart_purge$)|'
                                r'(^cart_id_[0-9]+_add$)|'
                                r'(^cart_id_[0-9]+_remove$)', data):
-                    # cart_query = """
-                    #             SELECT id, name, price, quantity, is_dish, is_water, dish_id, restaurant_id, water_id
-                    #             FROM cart WHERE user_uid = ?;
-                    #         """
-                    # cart = sql_query(cart_query, chat_id)
                     cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
 
                     if len(cart) == 0:
@@ -224,25 +216,17 @@ def index():
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
                     else:
-                        # rest_query = "SELECT name FROM restaurants WHERE id = ?;"
-                        # rest = sql_query(rest_query, cart[0][7])[0][0]
                         rest = db.session.query(Restaurant.name).filter_by(id=cart[0].restaurant_id).first()[0]
-                        # dishes_query = "SELECT id, name, description, composition, img_link FROM dishes;"
-                        # dishes = sql_query(dishes_query)
                         total = 0
                         current_id = cart[0].id
                         if re.search(r'(^cart_id_[0-9]+$)', data):
                             current_id = int(data.split('_')[2])
                         elif re.search(r'(^cart_id_[0-9]+_clear$)', data):
                             current_id = int(data.split('_')[2])
-                            # clear_query = "DELETE FROM cart WHERE id = ?;"
-                            # sql_query(clear_query, int(data.split('_')[2]))
                             db.session.query(cart).filter_by(id=current_id).delete()
                             db.session.commit()
                             current_id = cart[0].id
                         elif re.search(r'(^cart_purge$)', data):
-                            # purge_query = "DELETE FROM cart WHERE user_uid = ?;"
-                            # sql_query(purge_query, chat_id)
                             db.session.query(cart).filter_by(user_uid=chat_id).delete()
                             db.session.commit()
                             text = 'Ваша корзина пуста'
@@ -257,8 +241,6 @@ def index():
                             current_id = int(data.split('_')[2])
                             for item in cart:
                                 if current_id == item.id:
-                                    # query = "UPDATE cart SET quantity = ?;"
-                                    # sql_query(query, i[3] + 1)
                                     item.quantity += 1
                             db.session.commit()
                         elif re.search(r'(^cart_id_[0-9]+_remove$)', data):
@@ -266,13 +248,8 @@ def index():
                             for item in cart:
                                 if current_id == item.id:
                                     if item.quantity > 1:
-                                        # query = "UPDATE cart SET quantity = ?;"
-                                        # sql_query(query, i[3] - 1)
                                         item.quantity -= 1
                                     else:
-                                        # query = "DELETE FROM cart WHERE id = ?;"
-                                        # sql_query(query, int(data.split('_')[2]))
-                                        # cart = sql_query(cart_query, chat_id)
                                         db.session.query(Cart).filter_by(id=current_id).delete()
                             db.session.commit()
                             current_id = cart[0].id
@@ -342,33 +319,20 @@ def index():
 
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
+                    stat_data = db.session.query(Order).all()
                     if stat_id == 1:
-                        stat_query = 'SELECT * FROM orders;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Количество заказов в сумме\n{stat_data}')
                     elif stat_id == 2:
-                        stat_query = 'SELECT * FROM orders;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Количество заказов по ресторанам\n{stat_data}')
                     elif stat_id == 3:
-                        stat_query = 'SELECT * FROM orders;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Количество заказов в общем\n{stat_data}')
                     elif stat_id == 4:
-                        stat_query = 'SELECT * FROM orders;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Статистика заказов блюд\n{stat_data}')
                     elif stat_id == 5:
-                        stat_query = 'SELECT * FROM orders;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Количество изменений в заказе\n{stat_data}')
                     elif stat_id == 6:
-                        stat_query = 'SELECT * FROM orders;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Количество отмен заказов\n{stat_data}')
                     elif stat_id == 7:
-                        stat_query = 'SELECT * FROM users;'
-                        stat_data = sql_query(stat_query)
                         BOT.send_message(chat_id=chat_id, text=f'Количество посещений\n{stat_data}')
 
             else:
@@ -504,43 +468,12 @@ def get_value(val, data):
     return False
 
 
-def d_count_query(dish_name, uid, r_id):
-    """Возвращает количество блюд в корзине по признакам name, user_uid, restaurant_id"""
-    dish_count_query = "SELECT quantity FROM cart " \
-                       "WHERE name = ? and user_uid = ? and restaurant_id = ?;"
-    try:
-        return sql_query(dish_count_query, dish_name, uid, r_id)[0][0]
-    except Exception:
-        pass
-
-
-def sql_query(sql_text, *args):
-    """Возвращает результат запроса в БД"""
-    con = sqlite3.connect('db.sqlite3')
-    cur = con.cursor()
-    try:
-        cur.execute(sql_text, args)
-        sql_result = cur.fetchall()
-        if 'INSERT' or 'DELETE' or 'UPDATE' in sql_text:
-            con.commit()
-        return sql_result
-    except sqlite3.Error as er:
-        print('Запрос в БД не выполнен')
-        print('SQLite error: %s' % (' '.join(er.args)))
-        print("Exception class is: ", er.__class__)
-    con.close()
-
-
 def rest_menu_keyboard():
     """Возвращает меню с наименованиями ресторанов"""
-
-    rest_sql = "SELECT id, name FROM restaurants;"
-
-    restaurants = sql_query(rest_sql)
+    restaurants = db.session.query(Restaurant).all()
     keyboard = []
     for restaurant in restaurants:
-        keyboard.append([InlineKeyboardButton(f'{restaurant[1]}', callback_data=f'restaurant_{restaurant[0]}')])
-    # keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
+        keyboard.append([InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
     return InlineKeyboardMarkup(keyboard)
 
 

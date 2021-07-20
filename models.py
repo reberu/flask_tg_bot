@@ -52,3 +52,14 @@ class User(db.Model):
     last_name = db.Column(db.Text())
     address = db.Column(db.Text())
     phone = db.Column(db.Text())
+
+
+class Order(db.Model):
+    __tablename__ = 'orders'
+    id = db.Column(db.Integer(), primary_key=True)
+    uid = db.Column(db.Integer(), db.ForeignKey('users.uid'))
+    first_name = db.Column(db.Text(), db.ForeignKey('users.first_name'))
+    last_name = db.Column(db.Text(), db.ForeignKey('users.last_name'))
+    order_list = db.Column(db.Text())
+    order_total = db.Column(db.Integer())
+    order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
