@@ -50,6 +50,7 @@ class User(db.Model):
     uid = db.Column(db.Integer(), unique=True)
     first_name = db.Column(db.Text())
     last_name = db.Column(db.Text())
+    username = db.Column(db.Text())
     address = db.Column(db.Text())
     phone = db.Column(db.Text())
 
@@ -60,6 +61,27 @@ class Order(db.Model):
     uid = db.Column(db.Integer(), db.ForeignKey('users.uid'))
     first_name = db.Column(db.Text(), db.ForeignKey('users.first_name'))
     last_name = db.Column(db.Text(), db.ForeignKey('users.last_name'))
-    order_list = db.Column(db.Text())
     order_total = db.Column(db.Integer())
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+    order_datetime = db.Column(db.Integer())
+
+
+class OrderDetail(db.Model):
+    __tablename__ = 'details'
+    id = db.Column(db.Integer(), primary_key=True)
+    order_id = db.Column(db.Integer(), db.ForeignKey('orders.id'))
+    order_dish_name = db.Column(db.Integer(), db.ForeignKey('dishes.name'))
+    order_dish_cost = db.Column(db.Integer(), db.ForeignKey('dishes.cost'))
+    order_dish_quantity = db.Column(db.Integer())
+    order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+
+
+class History(db.Model):
+    __tablename__ = 'history'
+    id = db.Column(db.Integer(), primary_key=True)
+    message_id = db.Column(db.Integer())
+    chat_id = db.Column(db.Integer())
+    date = db.Column(db.Integer())
+    type = db.Column(db.Text())
+    message_text = db.Column(db.Text())
+    is_bot = db.Column(db.Boolean())
