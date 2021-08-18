@@ -138,8 +138,15 @@ def index():
                                 db.session.commit()
                             else:
                                 print('add new item')
-                                # При добавлении блюда из другого ресторана,
-                                # удалить блюда из корзины предыдущего ресторана с выводом сообщения юзеру об этом
+                                cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
+                                rest_id = data.split('_')[1]
+                                text = ''
+                                if cart:
+                                    for item in cart:
+                                        if rest_id != item.restaurant_id:
+                                            text = 'Вы добавили блюдо другого ресторана. Корзина будет очищена.'
+                                            db.session.query(Cart).filter_by(user_uid=chat_id, id=item.id).delete()
+                                        db.session.commit()
                                 cart_item = Cart(
                                     name=dish_name,
                                     price=sql_result[cur_id].cost,
@@ -152,6 +159,8 @@ def index():
                                 )
                                 db.session.add(cart_item)
                                 db.session.commit()
+                                if text != '':
+                                    BOT.sendMessage(chat_id=chat_id, text=text)
                         elif data.split('_')[5] == 'rem':
                             if dish_count and dish_count > 1:
                                 print('UPDATE')
