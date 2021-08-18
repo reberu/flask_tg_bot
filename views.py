@@ -614,8 +614,43 @@ def index():
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
                     stat_data = db.session.query(Order).all()
+                    months = {
+                        1: 'январь',
+                        2: 'февраль',
+                        3: 'март',
+                        4: 'апрель',
+                        5: 'май',
+                        6: 'июнь',
+                        7: 'июль',
+                        8: 'август',
+                        9: 'сентябрь',
+                        10: 'октябрь',
+                        11: 'ноябрь',
+                        12: 'декабрь'
+                    }
                     if stat_id == 1:
-                        BOT.send_message(chat_id=chat_id, text=f'Количество заказов в сумме\n{stat_data}')
+                        current_month = datetime.datetime.now().month
+                        current_month_total = 0
+                        current_month_rests_total = {}
+                        stat_data = db.session.query(Order).all()
+                        for data in stat_data:
+                            # print(f'Order #{data.id} from {datetime.utcfromtimestamp(data.order_datetime).strftime(
+                            # "%Y.%m.%d %H:%M:%S")}')
+                            order_date = int(datetime.datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
+                            if order_date == current_month:
+                                current_month_total += data.order_total
+                                rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
+                                try:
+                                    current_month_rests_total.update(
+                                        {rest: current_month_rests_total[rest] + data.order_total})
+                                except KeyError:
+                                    current_month_rests_total.update({rest: data.order_total})
+                        text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
+                        for item in current_month_rests_total:
+                            text += f'Общая сумма заказов в ресторане {item} за {months[current_month]} - ' \
+                                    f'{current_month_rests_total[item]}р.\n'
+
+                        BOT.send_message(chat_id=chat_id, text=text)
                     elif stat_id == 2:
                         BOT.send_message(chat_id=chat_id, text=f'Количество заказов по ресторанам\n{stat_data}')
                     elif stat_id == 3:
