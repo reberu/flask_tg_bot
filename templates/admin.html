@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    Панель администрирования
+{% endblock %}
+
+{% block content %}
+    <h2>Личный кабинет</h2>
+
+    <ul>
+        {% if current_user.ownership == 'all' %}
+            Вы администратор всех ресторанов
+        {% else %}
+            Вы администратор ресторана {{ current_user.ownership }}
+        {% endif %}
+    </ul>
+    <table style="margin-bottom:1%">
+        <tr>
+            <th>Название блюда</th>
+            <th>Стоимость</th>
+            <th>Описание</th>
+            <th>Состав</th>
+            <th>Категория</th>
+            <th>Изображение</th>
+            {% if current_user.ownership == 'all' %}
+                <th>Ресторан</th>
+            {% endif %}
+        </tr>
+    {% set ns = namespace (rest_id = 0) %}
+    {% for restaurant in restaurants %}
+
+        {% if current_user.ownership == restaurant.name %}
+            {% set ns.rest_id = restaurant.id %}
+            {% for dish in dishes|sort(attribute='category') %}
+                {% if dish.id_rest == ns.rest_id %}
+                <tr>
+                    <td>{{ dish.name }}</td>
+                    <td>{{ dish.cost }} р.</td>
+                    <td>{{ dish.description }}</td>
+                    <td>{{ dish.composition }}</td>
+                    <td>{{ dish.category }}</td>
+                    <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+
+        <!--Доделать вывод блюд для администратора всех ресторанов-->
+        {% elif current_user.ownership == 'all' %}
+            {% for dish in dishes %}
+                {% if dish.id_rest == restaurant.id %}
+                    <tr>
+                        <td>{{ dish.name }}</td>
+                        <td>{{ dish.cost }}</td>
+                        <td>{{ dish.description }}</td>
+                        <td>{{ dish.composition }}</td>
+                        <td>{{ dish.category }}</td>
+                        <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                        <td>{{ restaurant.name }}</td>
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
+    </table>
+    <br/>
+    <div class="accordion" id="accordionExample">
+      <div class="card">
+        <div class="card-header" id="headingTwo">
+          <h5 class="mb-0">
+            <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+              Добавить блюдо
+            </button>
+          </h5>
+        </div>
+      <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionExample">
+        <div class="card-body">
+            <form action="" method="post">
+
+                {{ dish_form.csrf_token() }}
+                <table>
+                    <tr>
+                        <td>{{ dish_form.name.label }}</td>
+                        <td>{{ dish_form.name }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.cost.label }}</td>
+                        <td>{{ dish_form.cost }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.description.label }}</td>
+                        <td>{{ dish_form.description }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.composition.label }}</td>
+                        <td>{{ dish_form.composition }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.img_link.label }}</td>
+                        <td>{{ dish_form.img_link }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.category.label }}</td>
+                        <td>{{ dish_form.category }}</td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.id_rest.label }}</td>
+                        <td>
+                            {% if ns.rest_id != 0 %}
+                                {{ dish_form.id_rest(value=ns.rest_id) }}
+                            {% else %}
+                                {{ dish_form.id_rest }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>{{ dish_form.submit }}</td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+      </div>
+      </div>
+        <div class="card">
+            <div class="card-header" id="headingThree">
+              <h2 class="mb-0">
+                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                  Добавить категорию
+                </button>
+              </h2>
+            </div>
+            <div id="collapseThree" class="collapse" aria-labelledby="headingThree" data-parent="#accordionExample">
+              <div class="card-body">
+                  <form action="" method="post">
+                    {{ category_form.csrf_token() }}
+                    <table>
+                        <tr>
+                            <td>{{ category_form.name.label }}</td>
+                            <td>{{ category_form.name }}</td>
+                        </tr>
+                        <tr>
+                            {% if ns.rest_id != 0 %}
+                                <td>
+                                    {{ category_form.restaurant_id(value=ns.rest_id) }}
+                                </td>
+                            {% else %}
+                                <td>
+                                    {{ category_form.restaurant_id }}
+                                </td>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <td>{{ category_form.submit }}</td>
+                        </tr>
+                    </table>
+                  </form>
+              </div>
+            </div>
+        </div>
+    </div>
+
+
+{% endblock %}

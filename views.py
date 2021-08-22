@@ -1,9 +1,11 @@
-import datetime
+from datetime import datetime
 
 import telegram.error
-from flask import render_template
+from flask import render_template, flash, redirect, url_for
 from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram import error
+
+from forms import LoginForm, DishForm, CategoryForm
 from settings import BOT_TOKEN
 
 import re
@@ -11,10 +13,11 @@ import requests
 import json
 
 from flask import request
+from flask_login import login_required, login_user, current_user, logout_user
 
-from app import app, db, sched
+from app import app, db, sched, login_manager
 
-from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail
+from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin
 
 BOT = Bot(BOT_TOKEN)
 URL = f'https://api.telegram.org/bot{BOT_TOKEN}/'
@@ -138,8 +141,15 @@ def index():
                                 db.session.commit()
                             else:
                                 print('add new item')
-                                # При добавлении блюда из другого ресторана,
-                                # удалить блюда из корзины предыдущего ресторана с выводом сообщения юзеру об этом
+                                cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
+                                rest_id = data.split('_')[1]
+                                text = ''
+                                if cart:
+                                    for item in cart:
+                                        if rest_id != item.restaurant_id:
+                                            text = 'Вы добавили блюдо другого ресторана. Корзина будет очищена.'
+                                            db.session.query(Cart).filter_by(user_uid=chat_id, id=item.id).delete()
+                                        db.session.commit()
                                 cart_item = Cart(
                                     name=dish_name,
                                     price=sql_result[cur_id].cost,
@@ -152,6 +162,8 @@ def index():
                                 )
                                 db.session.add(cart_item)
                                 db.session.commit()
+                                if text != '':
+                                    BOT.sendMessage(chat_id=chat_id, text=text)
                         elif data.split('_')[5] == 'rem':
                             if dish_count and dish_count > 1:
                                 print('UPDATE')
@@ -251,7 +263,7 @@ def index():
                             msg = History(
                                 message_id=message_id,
                                 chat_id=chat_id,
-                                date=datetime.datetime.now().strftime('%s'),
+                                date=datetime.now().strftime('%s'),
                                 type='message',
                                 message_text=text,
                                 is_bot=True
@@ -278,7 +290,7 @@ def index():
                         msg = History(
                             message_id=message_id,
                             chat_id=chat_id,
-                            date=datetime.datetime.now().strftime('%s'),
+                            date=datetime.now().strftime('%s'),
                             type='message',
                             message_text=text,
                             is_bot=True
@@ -497,7 +509,7 @@ def index():
                         msg = History(
                             message_id=message_id,
                             chat_id=chat_id,
-                            date=datetime.datetime.now().strftime('%s'),
+                            date=datetime.now().strftime('%s'),
                             type='message',
                             message_text=text,
                             is_bot=True
@@ -510,7 +522,7 @@ def index():
                     msg = History(
                         message_id=message_id,
                         chat_id=chat_id,
-                        date=datetime.datetime.now().strftime('%s'),
+                        date=datetime.now().strftime('%s'),
                         type='message',
                         message_text=text,
                         is_bot=True
@@ -534,7 +546,7 @@ def index():
                             last_name=last_name,
                             order_total=total,
                             order_rest_id=cart[0].restaurant_id,
-                            order_datetime=datetime.datetime.now().strftime('%s')
+                            order_datetime=datetime.now().strftime('%s')
                         )
                         db.session.add(order)
                         db.session.flush()
@@ -571,7 +583,7 @@ def index():
                         msg = History(
                             message_id=message_id,
                             chat_id=chat_id,
-                            date=datetime.datetime.now().strftime('%s'),
+                            date=datetime.now().strftime('%s'),
                             type='message',
                             message_text=text,
                             is_bot=True
@@ -587,7 +599,7 @@ def index():
                     order = db.session.query(Order).filter_by(id=order_id).first()
                     text = f'Ресторан принял ваш заказ № {order.id} и доставит '
                     time_text = ''
-                    sched_time = datetime.datetime.now() + datetime.timedelta(minutes=time)
+                    sched_time = datetime.now() + datetime.timedelta(minutes=time)
                     if time == 30:
                         time_text += 'в течении 30 минут'
                     elif time == 60:
@@ -629,14 +641,14 @@ def index():
                         12: 'декабрь'
                     }
                     if stat_id == 1:
-                        current_month = datetime.datetime.now().month
+                        current_month = datetime.now().month
                         current_month_total = 0
                         current_month_rests_total = {}
                         stat_data = db.session.query(Order).all()
                         for data in stat_data:
                             # print(f'Order #{data.id} from {datetime.utcfromtimestamp(data.order_datetime).strftime(
                             # "%Y.%m.%d %H:%M:%S")}')
-                            order_date = int(datetime.datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
+                            order_date = int(datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
                             if order_date == current_month:
                                 current_month_total += data.order_total
                                 rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
@@ -708,7 +720,7 @@ def index():
                         msg = History(
                             message_id=message_id,
                             chat_id=chat_id,
-                            date=datetime.datetime.now().strftime('%s'),
+                            date=datetime.now().strftime('%s'),
                             type='message',
                             message_text=text,
                             is_bot=True
@@ -798,7 +810,7 @@ def index():
                         msg = History(
                             message_id=message_id,
                             chat_id=chat_id,
-                            date=datetime.datetime.now().strftime('%s'),
+                            date=datetime.now().strftime('%s'),
                             type='message',
                             message_text=text,
                             is_bot=True
@@ -830,10 +842,72 @@ def index():
             print('BAD REQUEST!')
         return 'Bot action returned'
     elif request.method == 'GET':
-        return 'Main page is temporarily unavailable'
+        # return 'Main page is temporarily unavailable'
+        return render_template('index.html')
     else:
         print('request method - ', request.method)
-    # return render_template('index.html')
+
+
+@app.route('/login/', methods=['POST', 'GET'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = db.session.query(Admin).filter(Admin.username == form.username.data).first()
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember.data)
+            return redirect(url_for('admin'))
+
+        flash("Invalid username/password", 'error')
+        return redirect(url_for('login'))
+    return render_template('login.html', form=form)
+
+
+@app.route('/logout/')
+@login_required
+def logout():
+    logout_user()
+    flash("You have been logged out.")
+    return redirect(url_for('login'))
+
+
+@app.route('/admin', methods=['GET', 'POST'])
+@login_required
+def admin():
+    dishes = db.session.query(Dish).all()
+    restaurants = db.session.query(Restaurant).all()
+    dish_form = DishForm()
+    if dish_form.validate_on_submit():
+        name = dish_form.name.data
+        cost = dish_form.cost.data
+        description = dish_form.description.data
+        composition = dish_form.composition.data
+        img_link = dish_form.img_link.data
+        category = dish_form.category.data
+        id_rest = dish_form.id_rest.data
+
+        dish = Dish(name=name, cost=cost, description=description, composition=composition, img_link=img_link, category=category, id_rest=id_rest)
+        db.session.add(dish)
+        db.session.commit()
+        flash("Блюдо добавлено", "success")
+        return redirect(url_for('admin'))
+    category_form = CategoryForm()
+    if category_form.validate_on_submit():
+        name = category_form.name.data
+        restaurant_id = category_form.restaurant_id.data
+
+        category = Category(name=name, restaurant_id=restaurant_id)
+        db.session.add(category)
+        db.session.commit()
+        flash("Категория добавлена", "success")
+        return redirect(url_for('admin'))
+    return render_template('admin.html', dishes=dishes, restaurants=restaurants, dish_form=dish_form, category_form=category_form)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.query(Admin).get(user_id)
 
 
 def sendMsg(uid):
