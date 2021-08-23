@@ -12,3 +12,7 @@ Finally, your chat history will be minimal.
 
 Telegram bot works with webhook. To set up webhook you should call https://api.telegram.org/bot<token>/setwebhook?url=<yoururl>.
 For local testing you can use NGROK to obtain public URL (https://ngrok.com).
+  
+  
+After you setted up webhook run main.py with runserver parameter:
+  - python3 main.py runserver
