@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import telegram.error
 from flask import render_template, flash, redirect, url_for
@@ -65,12 +65,12 @@ def index():
                 is_bot=False)
             db.session.add(msg)
             db.session.commit()
+
             # Callback handlers
             if get_value("callback_query", r):
                 data = r['callback_query']['data']
                 print('callback - ', data)
                 buttons = []
-                # chat_id = r['callback_query']['message']['chat']['id']
                 message_id = r['callback_query']['message']['message_id']
                 if re.search(r'(restaurant_[0-9]+$)|'
                              r'(restaurant_[0-9]+_menu$)', data):
@@ -194,12 +194,14 @@ def index():
                         except IndexError:
                             cart_count = 0
                         print('cart_count', dish_name, cart_count)
+                        cb_data_first = f'restaurant_{rest_id}_cat{cat_id}_dish_{dish_id}'
+                        cb_data_last = f'{cur_chat_id}_{message_id}'
                         buttons = [[
                             InlineKeyboardButton('-️',
-                                                 callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{dish_id}_rem_{cur_chat_id}_{message_id}'),
+                                                 callback_data=f'{cb_data_first}_rem_{cb_data_last}'),
                             InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
                             InlineKeyboardButton('+️',
-                                                 callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{dish_id}_add_{cur_chat_id}_{message_id}')
+                                                 callback_data=f'{cb_data_first}_add_{cb_data_last}')
                         ]]
                         total = 0
                         cart_items = db.session.query(Cart).filter_by(user_uid=cur_chat_id).all()
@@ -235,12 +237,14 @@ def index():
                             except IndexError:
                                 cart_count = 0
                             print(dish)
+                            cb_data_first = f'restaurant_{rest_id}_cat{cat_id}_dish_{dish.id}'
+                            cb_data_last = f'{chat_id}_{message_id + current_id}'
                             buttons = [[
                                 InlineKeyboardButton('-',
-                                                     callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{dish.id}_rem_{chat_id}_{message_id + current_id}'),
+                                                     callback_data=f'{cb_data_first}_rem_{cb_data_last}'),
                                 InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
                                 InlineKeyboardButton('+️',
-                                                     callback_data=f'restaurant_{rest_id}_cat{cat_id}_dish_{dish.id}_add_{chat_id}_{message_id + current_id}')
+                                                     callback_data=f'{cb_data_first}_add_{cb_data_last}')
                             ]]
                             print(message_id + current_id)
                             total = 0
@@ -308,6 +312,7 @@ def index():
                             db.session.query(Cart).filter_by(id=current_id).delete()
                             db.session.commit()
                             cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
+                            cart_count = None
                             if cart:
                                 current_id = cart[0].id
                                 try:
@@ -448,6 +453,7 @@ def index():
                                 return "cart item removed"
                         print('show_cart handler')
                         print(cart)
+                        cart_count = None
                         try:
                             for item in cart:
                                 if current_id == item.id:
@@ -564,9 +570,11 @@ def index():
                         text += f'Общая сумма заказа: {total} р.\n'
                         text += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=chat_id).first()[0]}'
                         db.session.query(Cart).filter_by(user_uid=chat_id).delete()
-                        service_uid = db.session.query(Restaurant.service_uid).filter_by(id=order.order_rest_id).first()[0]
+                        service_uid = db.session.query(Restaurant.service_uid).filter_by(
+                            id=order.order_rest_id).first()[0]
                         db.session.commit()
                         BOT.send_message(chat_id=chat_id, text='Заказ оформлен')
+                        cb_data = f'order_change_{order.id}'
                         buttons = [
                             [InlineKeyboardButton('Принять и доставить за 30 минут',
                                                   callback_data=f'order_accept_{order.id}_30')],
@@ -577,7 +585,7 @@ def index():
                             [InlineKeyboardButton('Принять и доставить за 3 часа',
                                                   callback_data=f'order_accept_{order.id}_180')],
                             [InlineKeyboardButton('Не принят', callback_data='None')],
-                            [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_change_{order.id}')]
+                            [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                         ]
                         BOT.send_message(chat_id=service_uid, text=text, reply_markup=InlineKeyboardMarkup(buttons))
                         msg = History(
@@ -599,7 +607,7 @@ def index():
                     order = db.session.query(Order).filter_by(id=order_id).first()
                     text = f'Ресторан принял ваш заказ № {order.id} и доставит '
                     time_text = ''
-                    sched_time = datetime.now() + datetime.timedelta(minutes=time)
+                    sched_time = datetime.now() + timedelta(minutes=time)
                     if time == 30:
                         time_text += 'в течении 30 минут'
                     elif time == 60:
@@ -887,7 +895,15 @@ def admin():
         category = dish_form.category.data
         id_rest = dish_form.id_rest.data
 
-        dish = Dish(name=name, cost=cost, description=description, composition=composition, img_link=img_link, category=category, id_rest=id_rest)
+        dish = Dish(
+            name=name,
+            cost=cost,
+            description=description,
+            composition=composition,
+            img_link=img_link,
+            category=category,
+            id_rest=id_rest
+        )
         db.session.add(dish)
         db.session.commit()
         flash("Блюдо добавлено", "success")
@@ -902,7 +918,13 @@ def admin():
         db.session.commit()
         flash("Категория добавлена", "success")
         return redirect(url_for('admin'))
-    return render_template('admin.html', dishes=dishes, restaurants=restaurants, dish_form=dish_form, category_form=category_form)
+    return render_template(
+        'admin.html',
+        dishes=dishes,
+        restaurants=restaurants,
+        dish_form=dish_form,
+        category_form=category_form
+    )
 
 
 @login_manager.user_loader
@@ -911,12 +933,7 @@ def load_user(user_id):
 
 
 def sendMsg(uid):
-    BOT.send_message(chat_id=uid, text='hello there')
-
-
-def callback_minute():
-    print('callback_minute!')
-    BOT.send_message(chat_id=113737020, text='Test one minute!')
+    BOT.send_message(chat_id=uid, text='Заданное время закончилось')
 
 
 def write_json(data, filename='answer.json'):
