@@ -9,3 +9,6 @@ The bot message will change depending on the selected menu item.
 In the case of a choice of dishes, you don't have to scroll through a bunch of messages with images of dishes!
 The highlight of this project is the carousel restaurant menu in the bot message.
 Finally, your chat history will be minimal.
+
+Telegram bot works with webhook. To set up webhook you should call https://api.telegram.org/bot<token>/setwebhook?url=<yoururl>.
+For local testing you can use NGROK to obtain public URL (https://ngrok.com).
