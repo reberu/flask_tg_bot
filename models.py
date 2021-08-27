@@ -67,6 +67,7 @@ class Order(db.Model):
     order_total = db.Column(db.Integer())
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
     order_datetime = db.Column(db.Integer())
+    order_confirm = db.Column(db.Boolean(), default=False)
 
 
 class OrderDetail(db.Model):
@@ -75,6 +76,7 @@ class OrderDetail(db.Model):
     order_id = db.Column(db.Integer(), db.ForeignKey('orders.id'))
     order_dish_name = db.Column(db.Integer(), db.ForeignKey('dishes.name'))
     order_dish_cost = db.Column(db.Integer(), db.ForeignKey('dishes.cost'))
+    order_dish_id = db.Column(db.Integer(), db.ForeignKey('dishes.id'))
     order_dish_quantity = db.Column(db.Integer())
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
 
