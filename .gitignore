@@ -137,3 +137,5 @@ db_.sqlite3
 
 ngrok
 test.py
+
+bot.py
