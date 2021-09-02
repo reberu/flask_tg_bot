@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from os import mkdir
+from os.path import isdir
 
 import telegram.error
 from flask import render_template, flash, redirect, url_for
@@ -18,6 +20,8 @@ from flask_login import login_required, login_user, current_user, logout_user
 from app import app, db, sched, login_manager
 
 from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin
+
+from werkzeug.utils import secure_filename
 
 BOT = Bot(BOT_TOKEN)
 URL = f'https://api.telegram.org/bot{BOT_TOKEN}/'
@@ -706,7 +710,20 @@ def index():
                         ]
                         markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
                         BOT.send_message(chat_id, text, reply_markup=markup)
-
+                    elif parse_text(message) == '/my_orders':
+                        order = db.session.query(Order).filter_by(uid=chat_id, order_delivered=False).first()
+                        if order:
+                            details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
+                            date = datetime.utcfromtimestamp(order.order_datetime).strftime('%d.%m.%Y %H:%M:%S')
+                            text = f'Ваш заказ № {order.id} от {date}\n'
+                            for item in details:
+                                text += f'- {item.order_dish_name}\n'
+                            text += f'Общая стоимость заказа - {order.order_total}\n'
+                            restaurant = db.session.query(Restaurant).filter_by(id=order.order_rest_id).first()
+                            text += f'Ресторан - {restaurant.name}, {restaurant.address}, {restaurant.contact}'
+                        else:
+                            text = 'У Вас пока нет оформленных заказов'
+                        BOT.send_message(chat_id=chat_id, text=text)
                     elif parse_text(message) == 'Рестораны' or parse_text(message) == '/restaurants':
                         text = 'Пожалуйста, выберите ресторан:'
                         BOT.send_message(
@@ -954,9 +971,16 @@ def admin():
         cost = dish_form.cost.data
         description = dish_form.description.data
         composition = dish_form.composition.data
-        img_link = dish_form.img_link.data
-        category = dish_form.category.data
         id_rest = dish_form.id_rest.data
+        img_file = secure_filename(dish_form.img_file.data.filename)
+        # Поменять localhost на актуальное доменное имя или ip адрес
+        base_url = 'http://0e7a-79-133-74-170.ngrok.io/'
+        static_path = 'static/' + str(id_rest) + '/'
+        if not isdir(static_path):
+            mkdir(static_path)
+        dish_form.img_file.data.save(static_path + img_file)
+        img_link = base_url + static_path + img_file
+        category = dish_form.category.data
 
         dish = Dish(
             name=name,

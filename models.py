@@ -68,6 +68,7 @@ class Order(db.Model):
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
     order_datetime = db.Column(db.Integer())
     order_confirm = db.Column(db.Boolean(), default=False)
+    order_delivered = db.Column(db.Boolean(), default=False)
 
 
 class OrderDetail(db.Model):
