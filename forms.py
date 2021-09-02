@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField
 from wtforms import StringField, SubmitField, BooleanField, PasswordField, IntegerField, HiddenField
 from wtforms.validators import DataRequired
 
@@ -15,7 +16,8 @@ class DishForm(FlaskForm):
     cost = IntegerField("Стоимость", validators=[DataRequired()])
     description = StringField("Описание", validators=[DataRequired()])
     composition = StringField("Состав", validators=[DataRequired()])
-    img_link = StringField("Сссылка на изображение", validators=[DataRequired()])
+    # img_link = StringField("Сссылка на изображение", validators=[DataRequired()])
+    img_file = FileField("Загрузите изображение", validators=[DataRequired()])
     category = StringField("Категория", validators=[DataRequired()])
     id_rest = HiddenField("Идентификатор ресторана")
     submit = SubmitField("Добавить")

@@ -139,3 +139,6 @@ ngrok
 test.py
 
 bot.py
+
+!static
+static/*
