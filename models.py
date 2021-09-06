@@ -26,7 +26,7 @@ class Dish(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.Text(), nullable=False)
     cost = db.Column(db.Integer(), nullable=False)
-    description = db.Column(db.Text(), nullable=False)
+    description = db.Column(db.Text(), nullable=True, default=None)
     composition = db.Column(db.Text(), nullable=False)
     img_link = db.Column(db.Text(), nullable=False)
     category = db.Column(db.Text(), db.ForeignKey('categories.name'))
@@ -68,7 +68,7 @@ class Order(db.Model):
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
     order_datetime = db.Column(db.Integer())
     order_confirm = db.Column(db.Boolean(), default=False)
-    order_delivered = db.Column(db.Boolean(), default=False)
+    order_state = db.Column(db.Text(), default='Собран')
 
 
 class OrderDetail(db.Model):
