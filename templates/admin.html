@@ -25,7 +25,6 @@
                                 <div class="d-flex justify-content-start align-items-center">
                                     <div class="p-2 flex-fill bd-highlight">Название блюда</div>
                                     <div class="p-2 flex-fill bd-highlight">Стоимость</div>
-                                    <div class="p-2 flex-fill bd-highlight">Описание</div>
                                     <div class="p-2 flex-fill bd-highlight">Состав</div>
                                     <div class="p-2 flex-fill bd-highlight">Категория</div>
                                     <div class="p-2 flex-fill bd-highlight">Изображение</div>
@@ -35,7 +34,6 @@
                                         <div class="d-flex justify-content-start align-items-center">
                                             <div class="p-2 flex-fill bd-highlight">{{ dish.name }}</div>
                                             <div class="p-2 flex-fill bd-highlight">{{ dish.cost }}</div>
-                                            <div class="p-2 flex-fill bd-highlight">{{ dish.description }}</div>
                                             <div class="p-2 flex-fill bd-highlight">{{ dish.composition }}</div>
                                             <div class="p-2 flex-fill bd-highlight">{{ dish.category }}</div>
                                             <div class="p-2 flex-fill bd-highlight"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></div>
@@ -54,7 +52,6 @@
                 <tr>
                     <th>Название блюда</th>
                     <th>Стоимость</th>
-                    <th>Описание</th>
                     <th>Состав</th>
                     <th>Категория</th>
                     <th>Изображение</th>
@@ -68,7 +65,6 @@
                             <tr>
                                 <td>{{ dish.name }}</td>
                                 <td>{{ dish.cost }} р.</td>
-                                <td>{{ dish.description }}</td>
                                 <td>{{ dish.composition }}</td>
                                 <td>{{ dish.category }}</td>
                                 <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
@@ -101,10 +97,6 @@
                             <tr>
                                 <td>{{ dish_form.cost.label }}</td>
                                 <td>{{ dish_form.cost }}</td>
-                            </tr>
-                            <tr>
-                                <td>{{ dish_form.description.label }}</td>
-                                <td>{{ dish_form.description }}</td>
                             </tr>
                             <tr>
                                 <td>{{ dish_form.composition.label }}</td>
