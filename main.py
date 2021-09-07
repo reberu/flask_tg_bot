@@ -1,4 +1,3 @@
-import os
 from app import app, manager, sched
 import views
 import logging

@@ -41,18 +41,14 @@ def index():
                 last_name = r['callback_query']['message']['chat']['last_name']
                 username = r['callback_query']['message']['chat']['username']
                 message_id = r['callback_query']['message']['message_id']
-                date = r['callback_query']['message']['date']
                 msg_text = r['callback_query']['message']['text']
-                msg_type = 'callback_query'
             elif get_value('message', r):
                 chat_id = r['message']['chat']['id']
                 first_name = r['message']['chat']['first_name']
                 last_name = r['message']['chat']['last_name']
                 username = r['message']['chat']['username']
                 message_id = r['message']['message_id']
-                date = r['message']['date']
                 msg_text = r['message']['text']
-                msg_type = 'message'
             else:
                 pass
             user = db.session.query(User).filter_by(uid=chat_id).first()
@@ -489,16 +485,10 @@ def index():
                                 reply_markup=InlineKeyboardMarkup(buttons),
                                 parse_mode=ParseMode.HTML
                             )
-                        # write_history(message_id, chat_id, text, is_bot=True)
                 elif re.search(r'(^cart_confirm$)', data):
                     text = 'Укажите адрес доставки'
                     BOT.send_message(text=text, chat_id=chat_id)
                     write_history(message_id, chat_id, text, is_bot=True)
-                elif re.search(r'^cart_change_confirm_order_[0-9]+$', data):
-                    order_id = int(data.split('_')[4])
-                    cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
-                    order = db.session.query(Order).filter_by(id=order_id).first()
-                    order_details = db.session.query(OrderDetail).filter_by(order_id=order_id).all()
 
                 elif data == 'to_rest':
                     BOT.editMessageText(
@@ -995,7 +985,7 @@ def index():
                         mention = "[" + username + "](tg://user?id=" + str(chat_id) + ")"
                         text = f'hi {mention}'
                         BOT.send_message(chat_id=chat_id, text=f'hi {mention}', parse_mode="Markdown")
-                        if re.search(r'\[.+\]\(tg:\/\/user\?id=[0-9]+\)', bot_msg):
+                        if re.search(r'\[.+\(tg:user\?id=[0-9]+\)', bot_msg):
                             print('We found mention tag!')
                         write_history(message_id, chat_id, text, is_bot=True)
                     elif parse_text(message) == 'Test':
