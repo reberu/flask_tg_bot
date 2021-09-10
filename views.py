@@ -4,7 +4,7 @@ from os.path import isdir
 
 import telegram.error
 from flask import render_template, flash, redirect, url_for
-from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, KeyboardButton
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm
@@ -36,19 +36,19 @@ def index():
             chat_id, first_name, last_name, username, date = None, None, None, None, None
             message_id, msg_text, msg_type = None, None, None
             if get_value('callback_query', r):
-                chat_id = r['callback_query']['message']['chat']['id']
-                first_name = r['callback_query']['message']['chat']['first_name']
-                last_name = r['callback_query']['message']['chat']['last_name']
-                username = r['callback_query']['message']['chat']['username']
-                message_id = r['callback_query']['message']['message_id']
-                msg_text = r['callback_query']['message']['text']
+                chat_id = r.get('callback_query').get('message').get('chat').get('id')
+                first_name = r.get('callback_query').get('message').get('chat').get('first_name')
+                last_name = r.get('callback_query').get('message').get('chat').get('last_name')
+                username = r.get('callback_query').get('message').get('chat').get('username')
+                message_id = r.get('callback_query').get('message').get('message_id')
+                msg_text = r.get('callback_query').get('message').get('text')
             elif get_value('message', r):
-                chat_id = r['message']['chat']['id']
-                first_name = r['message']['chat']['first_name']
-                last_name = r['message']['chat']['last_name']
-                username = r['message']['chat']['username']
-                message_id = r['message']['message_id']
-                msg_text = r['message']['text']
+                chat_id = r.get('message').get('chat').get('id')
+                first_name = r.get('message').get('chat').get('first_name')
+                last_name = r.get('message').get('chat').get('last_name')
+                username = r.get('message').get('chat').get('username')
+                message_id = r.get('message').get('message_id')
+                msg_text = r.get('message').get('text')
             else:
                 pass
             user = db.session.query(User).filter_by(uid=chat_id).first()
@@ -72,9 +72,6 @@ def index():
                         buttons.append(
                             [InlineKeyboardButton(category.name,
                                                   callback_data=f'restaurant_{rest_id}_cat{category.id}')])
-                    buttons.append(
-                        [InlineKeyboardButton('Узнать время доставки',
-                                              callback_data=f'restaurant_{rest_id}_deliverytime')])
                     buttons.append([InlineKeyboardButton('Назад', callback_data='back_to_rest_kb')])
                     if 'menu' in data:
                         BOT.sendMessage(
@@ -136,6 +133,7 @@ def index():
                                 cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
                                 rest_id = int(data.split('_')[1])
                                 text = ''
+                                service_uid = db.session.query(Restaurant.service_uid).filter_by(id=rest_id).first()[0]
                                 if cart:
                                     for item in cart:
                                         if rest_id != item.restaurant_id:
@@ -150,7 +148,8 @@ def index():
                                     is_dish=1,
                                     is_water=0,
                                     dish_id=data.split('_')[4],
-                                    restaurant_id=data.split('_')[1]
+                                    restaurant_id=data.split('_')[1],
+                                    service_uid=service_uid
                                 )
                                 db.session.add(cart_item)
                                 db.session.commit()
@@ -268,12 +267,7 @@ def index():
 
                     if len(cart) == 0:
                         text = 'Ваша корзина пуста'
-                        buttons = [[InlineKeyboardButton('Назад', callback_data='to_rest')]]
-                        BOT.send_message(
-                            chat_id=chat_id,
-                            text=text,
-                            reply_markup=InlineKeyboardMarkup(buttons)
-                        )
+                        BOT.send_message(chat_id=chat_id, text=text)
                         write_history(message_id, chat_id, text, is_bot=True)
                     else:
                         rest = db.session.query(Restaurant.name).filter_by(id=cart[0].restaurant_id).first()[0]
@@ -314,8 +308,8 @@ def index():
                                     if item.id == current_id:
                                         cart_dish_id = item.dish_id
                                 dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
-
                                 text += f'<a href="{dish.img_link}">{rest}</a>'
+                                text += dish.name
                                 # text += f'\nОписание - {dish.description}'
                                 text += f'\nСостав: {dish.composition}'
                                 text += f'\nСтоимость - {dish.cost}'
@@ -345,25 +339,13 @@ def index():
                                 return text
                             else:
                                 text = 'Ваша корзина пуста'
-                                buttons = [[InlineKeyboardButton('Назад', callback_data='to_rest')]]
-                                BOT.sendMessage(
-                                    chat_id=chat_id,
-                                    # message_id=message_id,
-                                    text=text,
-                                    reply_markup=InlineKeyboardMarkup(buttons)
-                                )
+                                BOT.sendMessage(chat_id=chat_id, text=text)
                             return data
                         elif re.search(r'(^cart_purge$)', data):
                             db.session.query(Cart).filter_by(user_uid=chat_id).delete()
                             db.session.commit()
                             text = 'Ваша корзина пуста'
-                            buttons = [[InlineKeyboardButton('Назад', callback_data='to_rest')]]
-                            BOT.edit_message_text(
-                                chat_id=chat_id,
-                                message_id=message_id,
-                                text=text,
-                                reply_markup=InlineKeyboardMarkup(buttons)
-                            )
+                            BOT.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
                             return text
                         elif re.search(r'(^cart_id_[0-9]+_add$)', data):
                             current_id = int(data.split('_')[2])
@@ -373,58 +355,68 @@ def index():
                             db.session.commit()
                         elif re.search(r'(^cart_id_[0-9]+_remove$)', data):
                             current_id = int(data.split('_')[2])
-                            if cart[current_id - 1].quantity > 1:
-                                cart[current_id - 1].quantity -= 1
-                            else:
-                                print('Cart item remove handler')
-                                print(cart)
-                                db.session.query(Cart).filter_by(id=current_id).delete()
-                                db.session.commit()
-                                cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
-                                current_id = cart[0].id
-                                cart_count = cart[0].quantity
-                                buttons = []
-                                cart_buttons = [
-                                    InlineKeyboardButton('❌', callback_data=f'cart_id_{cart[0].id}_clear')]
-                                text = '<b>Корзина</b>\n'
-                                cart_dish_id = None
-                                for i, item in enumerate(cart, start=1):
-                                    cart_buttons.append(
-                                        InlineKeyboardButton(f'{i}', callback_data=f'cart_id_{item.id}'))
-                                    total += item.quantity * item.price
+                            for item in cart:
+                                if current_id == item.id:
+                                    if len(cart) >= 1 and item.quantity > 1:
+                                        item.quantity -= 1
+                                        db.session.commit()
+                                    elif len(cart) == 1 and item.quantity == 1:
+                                        db.session.query(Cart).filter_by(id=current_id).delete()
+                                        db.session.commit()
+                                        text = 'Ваша корзина пуста'
+                                        BOT.editMessageText(chat_id=chat_id, message_id=message_id, text=text)
+                                        return 'empty cart'
+                                    elif len(cart) > 1 and item.quantity == 1:
+                                        print('Cart item remove handler')
+                                        print(cart)
+                                        db.session.query(Cart).filter_by(id=current_id).delete()
+                                        db.session.commit()
+                                        cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
+                                        current_id = cart[0].id
+                                        cart_count = cart[0].quantity
+                                        buttons = []
+                                        cart_buttons = [
+                                            InlineKeyboardButton('❌', callback_data=f'cart_id_{cart[0].id}_clear')]
+                                        text = '<b>Корзина</b>\n'
+                                        cart_dish_id = None
+                                        for i, item in enumerate(cart, start=1):
+                                            cart_buttons.append(
+                                                InlineKeyboardButton(f'{i}', callback_data=f'cart_id_{item.id}'))
+                                            total += item.quantity * item.price
 
-                                    if item.id == current_id:
-                                        cart_dish_id = item.dish_id
-                                dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
-
-                                text += f'<a href="{dish.img_link}">{rest}</a>'
-                                # text += f'\nОписание - {dish.description}'
-                                text += f'\nСостав: {dish.composition}'
-                                text += f'\nСтоимость - {dish.cost}'
-                                buttons.append(cart_buttons)
-                                buttons.append([
-                                    InlineKeyboardButton('-',
-                                                         callback_data=f'cart_id_{current_id}_remove'),
-                                    InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
-                                    InlineKeyboardButton('+',
-                                                         callback_data=f'cart_id_{current_id}_add')
-                                ])
-                                buttons.append([
-                                    InlineKeyboardButton('Очистить️',
-                                                         callback_data=f'cart_purge'),
-                                    InlineKeyboardButton('Меню️',
-                                                         callback_data=f'restaurant_{cart[0].restaurant_id}')
-                                ])
-                                buttons.append([InlineKeyboardButton(f'Оформить заказ на сумму {total}',
-                                                                     callback_data='cart_confirm')])
-                                BOT.editMessageText(
-                                    text=text,
-                                    chat_id=chat_id,
-                                    message_id=message_id,
-                                    reply_markup=InlineKeyboardMarkup(buttons),
-                                    parse_mode=ParseMode.HTML
-                                )
-                                return "cart item removed"
+                                            if item.id == current_id:
+                                                cart_dish_id = item.dish_id
+                                        dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
+                                        text += f'<a href="{dish.img_link}">{rest}</a>'
+                                        text += f'{dish.name}\n'
+                                        text += f'\nСостав: {dish.composition}'
+                                        text += f'\nСтоимость - {dish.cost}'
+                                        buttons.append(cart_buttons)
+                                        buttons.append([
+                                            InlineKeyboardButton('-',
+                                                                 callback_data=f'cart_id_{current_id}_remove'),
+                                            InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
+                                            InlineKeyboardButton('+',
+                                                                 callback_data=f'cart_id_{current_id}_add')
+                                        ])
+                                        buttons.append([
+                                            InlineKeyboardButton('Очистить️',
+                                                                 callback_data=f'cart_purge'),
+                                            InlineKeyboardButton('Меню️',
+                                                                 callback_data=f'restaurant_{cart[0].restaurant_id}')
+                                        ])
+                                        buttons.append([InlineKeyboardButton(f'Оформить заказ на сумму {total}',
+                                                                             callback_data='cart_confirm')])
+                                        BOT.editMessageText(
+                                            text=text,
+                                            chat_id=chat_id,
+                                            message_id=message_id,
+                                            reply_markup=InlineKeyboardMarkup(buttons),
+                                            parse_mode=ParseMode.HTML
+                                        )
+                                        return "cart item removed"
+                                    else:
+                                        pass
                         print('show_cart handler')
                         cart_count = None
                         try:
@@ -450,8 +442,8 @@ def index():
                                 cart_dish_id = item.dish_id
                         dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
 
-                        text += f'<a href="{dish.img_link}">{rest}</a>'
-                        # text += f'\nОписание - {dish.description}'
+                        text += f'<a href="{dish.img_link}">{rest}</a>\n'
+                        text += dish.name
                         text += f'\nСостав: {dish.composition}'
                         text += f'\nСтоимость - {dish.cost}'
                         buttons.append(cart_buttons)
@@ -736,7 +728,7 @@ def index():
                     buttons.append([InlineKeyboardButton('Отменить заказ', callback_data=cb_data)])
                     BOT.sendMessage(
                         text=text,
-                        chat_id=chat_id,
+                        chat_id=order.uid,
                         reply_markup=InlineKeyboardMarkup(buttons),
                         parse_mode=ParseMode.HTML
                     )
@@ -885,8 +877,8 @@ def index():
                     if parse_text(message) == '/start':
                         text = f'Приветствую, {name}!\nВыбери что нужно.'
                         keyboard = [
-                            ['Рестораны', 'Корзина'],
-                            [' ', 'Оформить заказ']
+                            [KeyboardButton('Рестораны'), KeyboardButton('Корзина')],
+                            [KeyboardButton(' '), KeyboardButton('Оформить заказ')]
                         ]
                         markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
                         BOT.send_message(chat_id, text, reply_markup=markup)
@@ -915,12 +907,7 @@ def index():
                         cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
                         if len(cart) == 0:
                             text = 'Ваша корзина пуста'
-                            buttons = [[InlineKeyboardButton('Назад', callback_data='to_rest')]]
-                            BOT.send_message(
-                                chat_id=chat_id,
-                                text=text,
-                                reply_markup=InlineKeyboardMarkup(buttons)
-                            )
+                            BOT.send_message(chat_id=chat_id, text=text)
                         else:
                             rest = db.session.query(Restaurant.name).filter_by(id=cart[0].restaurant_id).first()[0]
                             dishes = db.session.query(Dish).all()
@@ -1076,7 +1063,8 @@ def index():
                                 )
                                 return 'Order change'
                             elif bot_msg == 'Укажите адрес доставки':
-                                text = 'Укажите номер телефона'
+                                text = 'Отправить номер телефона'
+                                
                                 BOT.send_message(chat_id=chat_id, text=text)
                                 write_history(message_id, chat_id, text, is_bot=True)
                             elif bot_msg == 'Укажите номер телефона' or 'Вы указали некорректный номер телефона':

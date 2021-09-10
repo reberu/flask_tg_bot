@@ -50,7 +50,7 @@ class Cart(db.Model):
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer(), primary_key=True)
-    uid = db.Column(db.Integer(), unique=True)
+    uid = db.Column(db.Integer(), unique=True, nullable=False)
     first_name = db.Column(db.Text())
     last_name = db.Column(db.Text())
     username = db.Column(db.Text())
