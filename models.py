@@ -26,7 +26,6 @@ class Dish(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.Text(), nullable=False)
     cost = db.Column(db.Integer(), nullable=False)
-    description = db.Column(db.Text(), nullable=True, default=None)
     composition = db.Column(db.Text(), nullable=False)
     img_link = db.Column(db.Text(), nullable=False)
     category = db.Column(db.Text(), db.ForeignKey('categories.name'))

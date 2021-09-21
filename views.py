@@ -172,7 +172,6 @@ def index():
                         text = f'{rest_name}\n'
                         text += f'<a href="{sql_result[cur_id].img_link}">.</a>'
                         text += f'\n<b>{dish_name}</b>'
-                        # text += f'\nОписание - {sql_result[cur_id].description}'
                         text += f'\nСостав: {sql_result[cur_id].composition}'
                         text += f'\nСтоимость - {sql_result[cur_id].cost} р.'
 
@@ -216,7 +215,6 @@ def index():
                             text = f'{rest_name}\n'
                             text += f'<a href="{dish.img_link}">.</a>'
                             text += f'\n<b>{dish.name}</b>'
-                            # text += f'\nОписание - {dish.description}'
                             text += f'\nСостав: {dish.composition}'
                             text += f'\nСтоимость - {dish.cost} р.'
 
@@ -310,7 +308,6 @@ def index():
                                 dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
                                 text += f'<a href="{dish.img_link}">{rest}</a>'
                                 text += dish.name
-                                # text += f'\nОписание - {dish.description}'
                                 text += f'\nСостав: {dish.composition}'
                                 text += f'\nСтоимость - {dish.cost}'
                                 buttons.append(cart_buttons)
@@ -936,7 +933,6 @@ def index():
 
                                 if dish.id == cart_dish_id:
                                     text += f'<a href="{dish.img_link}">{rest}</a>'
-                                    # text += f'\nОписание - {dish.description}'
                                     text += f'\nСостав: {dish.composition}'
                                     text += f'\nСтоимость - {cart[0].price}'
                             buttons.append(cart_buttons)
@@ -1035,7 +1031,6 @@ def index():
 
                                     if dish.id == cart_dish_id:
                                         text += f'<a href="{dish.img_link}">{order.order_rest_id}</a>'
-                                        # text += f'\nОписание - {dish.description}'
                                         text += f'\nСостав: {dish.composition}'
                                         text += f'\nСтоимость - {cart[0].price}'
                                 buttons.append(cart_buttons)
@@ -1136,12 +1131,11 @@ def admin():
     if dish_form.validate_on_submit():
         name = dish_form.name.data
         cost = dish_form.cost.data
-        # description = dish_form.description.data
         composition = dish_form.composition.data
         id_rest = dish_form.id_rest.data
         img_file = secure_filename(dish_form.img_file.data.filename)
         # Поменять localhost на актуальное доменное имя или ip адрес
-        base_url = 'http://5277-79-133-74-170.ngrok.io/'
+        base_url = 'http://ba9c-94-245-132-241.ngrok.io/'
         static_path = 'static/' + str(id_rest) + '/'
         if not isdir(static_path):
             mkdir(static_path)
@@ -1152,7 +1146,6 @@ def admin():
         dish = Dish(
             name=name,
             cost=cost,
-            # description=description,
             composition=composition,
             img_link=img_link,
             category=category,
