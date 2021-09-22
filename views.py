@@ -7,7 +7,7 @@ from flask import render_template, flash, redirect, url_for
 from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, KeyboardButton
 from telegram import error
 
-from forms import LoginForm, DishForm, CategoryForm
+from forms import LoginForm, DishForm, CategoryForm, DeleteForm
 from settings import BOT_TOKEN
 
 import re
@@ -681,31 +681,53 @@ def index():
                         id=order.order_rest_id).first()[0]
                     if data.split('_')[2] != 'user':
                         text = f'Поступил заказ № {order.id}\n'
+                        text += 'Состав заказа:\n'
+                        for item in details:
+                            text += f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n'
+                        text += f'Общая сумма заказа: {total} р.\n'
+                        text += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=order.uid).first()[0]}'
+                        buttons = [
+                            [InlineKeyboardButton('Принять и доставить за 30 минут',
+                                                  callback_data=f'order_accept_{order.id}_30')],
+                            [InlineKeyboardButton('Принять и доставить за 1 час',
+                                                  callback_data=f'order_accept_{order.id}_60')],
+                            [InlineKeyboardButton('Принять и доставить за 2 часа',
+                                                  callback_data=f'order_accept_{order.id}_120')],
+                            [InlineKeyboardButton('Принять и доставить за 3 часа',
+                                                  callback_data=f'order_accept_{order.id}_180')],
+                            [InlineKeyboardButton('Не принят', callback_data='None')],
+                            [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
+                        ]
+                        BOT.editMessageText(
+                            chat_id=service_uid,
+                            message_id=message_id,
+                            text=text,
+                            reply_markup=InlineKeyboardMarkup(buttons)
+                        )
                     else:
                         text = f'Клиент согласен с изменением заказа № {order.id}\n'
-                    text += 'Состав заказа:\n'
-                    for item in details:
-                        text += f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n'
-                    text += f'Общая сумма заказа: {total} р.\n'
-                    text += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=order.uid).first()[0]}'
-                    buttons = [
-                        [InlineKeyboardButton('Принять и доставить за 30 минут',
-                                              callback_data=f'order_accept_{order.id}_30')],
-                        [InlineKeyboardButton('Принять и доставить за 1 час',
-                                              callback_data=f'order_accept_{order.id}_60')],
-                        [InlineKeyboardButton('Принять и доставить за 2 часа',
-                                              callback_data=f'order_accept_{order.id}_120')],
-                        [InlineKeyboardButton('Принять и доставить за 3 часа',
-                                              callback_data=f'order_accept_{order.id}_180')],
-                        [InlineKeyboardButton('Не принят', callback_data='None')],
-                        [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
-                    ]
-                    BOT.editMessageText(
-                        chat_id=service_uid,
-                        message_id=message_id,
-                        text=text,
-                        reply_markup=InlineKeyboardMarkup(buttons)
-                    )
+                        text += 'Состав заказа:\n'
+                        for item in details:
+                            text += f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n'
+                        text += f'Общая сумма заказа: {total} р.\n'
+                        text += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=order.uid).first()[0]}'
+                        buttons = [
+                            [InlineKeyboardButton('Принять и доставить за 30 минут',
+                                                  callback_data=f'order_accept_{order.id}_30')],
+                            [InlineKeyboardButton('Принять и доставить за 1 час',
+                                                  callback_data=f'order_accept_{order.id}_60')],
+                            [InlineKeyboardButton('Принять и доставить за 2 часа',
+                                                  callback_data=f'order_accept_{order.id}_120')],
+                            [InlineKeyboardButton('Принять и доставить за 3 часа',
+                                                  callback_data=f'order_accept_{order.id}_180')],
+                            [InlineKeyboardButton('Не принят', callback_data='None')],
+                            [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
+                        ]
+                        BOT.sendMessage(
+                            chat_id=service_uid,
+                            text=text,
+                            reply_markup=InlineKeyboardMarkup(buttons)
+                        )
                 elif re.search(r'^order_[0-9]+_send2user$', data):
                     order = db.session.query(Order).filter_by(id=int(data.split('_')[1])).first()
                     details = db.session.query(OrderDetail).filter_by(order_id=int(data.split('_')[1])).all()
@@ -1165,12 +1187,20 @@ def admin():
         db.session.commit()
         flash("Категория добавлена", "success")
         return redirect(url_for('admin'))
+    delete_form = DeleteForm()
+    if delete_form.validate_on_submit():
+        dish_id = delete_form.delete_id.data
+        db.session.query(Dish).filter_by(id=dish_id).delete()
+        db.session.commit()
+        flash("Блюдо успешно удалено", "success")
+        return redirect(url_for('admin'))
     return render_template(
         'admin.html',
         dishes=dishes,
         restaurants=restaurants,
         dish_form=dish_form,
-        category_form=category_form
+        category_form=category_form,
+        delete_form=delete_form
     )
 
 
