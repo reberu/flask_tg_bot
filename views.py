@@ -376,13 +376,13 @@ def index():
                                             InlineKeyboardButton('❌', callback_data=f'cart_id_{cart[0].id}_clear')]
                                         text = '<b>Корзина</b>\n'
                                         cart_dish_id = None
-                                        for i, item in enumerate(cart, start=1):
+                                        for i, good in enumerate(cart, start=1):
                                             cart_buttons.append(
-                                                InlineKeyboardButton(f'{i}', callback_data=f'cart_id_{item.id}'))
-                                            total += item.quantity * item.price
+                                                InlineKeyboardButton(f'{i}', callback_data=f'cart_id_{good.id}'))
+                                            total += item.quantity * good.price
 
-                                            if item.id == current_id:
-                                                cart_dish_id = item.dish_id
+                                            if good.id == current_id:
+                                                cart_dish_id = good.dish_id
                                         dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
                                         text += f'<a href="{dish.img_link}">{rest}</a>'
                                         text += f'{dish.name}\n'
@@ -844,7 +844,8 @@ def index():
                                 rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
                                 try:
                                     current_month_rests_total.update(
-                                        {rest: current_month_rests_total[rest] + data.order_total})
+                                        {rest: current_month_rests_total[rest] + data.order_total}
+                                    )
                                 except KeyError:
                                     current_month_rests_total.update({rest: data.order_total})
                         text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
@@ -1085,21 +1086,22 @@ def index():
                                 BOT.send_message(chat_id=chat_id, text=text)
                                 write_history(message_id, chat_id, text, is_bot=True)
                             elif bot_msg == 'Укажите номер телефона' or 'Вы указали некорректный номер телефона':
-                                if re.search(r'^((\+7|7|8)+([0-9]){10})$', message):
-                                    bot_msg = db.session.query(History).filter_by(message_id=message_id - 2,
-                                                                                  is_bot=False).first().message_text
-                                    cur_usr = db.session.query(User).filter_by(uid=chat_id).first()
-                                    cur_usr.address = bot_msg
-                                    cur_usr.phone = message
-                                    db.session.commit()
-                                    text = f'Адрес доставки: {bot_msg}\n'
-                                    text += f'Контактный номер: {message}'
-                                    button = [[InlineKeyboardButton('Отправить', callback_data='order_confirm')]]
-                                    BOT.send_message(chat_id=chat_id,
-                                                     text='Мы приняли ваши данные',
-                                                     reply_markup=InlineKeyboardMarkup(button))
-                                else:
-                                    BOT.send_message(chat_id=chat_id, text='Вы указали некорректный номер телефона')
+                                bot_msg = db.session.query(History).filter_by(message_id=message_id - 2,
+                                                                              is_bot=False).first().message_text
+                                cur_usr = db.session.query(User).filter_by(uid=chat_id).first()
+                                cur_usr.address = bot_msg
+                                cur_usr.phone = message
+                                db.session.commit()
+                                text = 'Вы указали:\n'
+                                text += f'Адрес доставки: {bot_msg}\n'
+                                text += f'Контактный номер: {message}'
+                                buttons = [
+                                    [InlineKeyboardButton('Отправить', callback_data='order_confirm')],
+                                    [InlineKeyboardButton('Изменить данные', callback_data='cart_confirm')]
+                                ]
+                                BOT.send_message(chat_id=chat_id,
+                                                 text=text,
+                                                 reply_markup=InlineKeyboardMarkup(buttons))
                         except TypeError:
                             print('TypeError')
                             print("We can't handle this message", message)
