@@ -55,6 +55,7 @@
                     <th>Состав</th>
                     <th>Категория</th>
                     <th>Изображение</th>
+                    <th></th>
                 </tr>
                 {% for restaurant in restaurants %}
 
@@ -68,6 +69,13 @@
                                 <td>{{ dish.composition }}</td>
                                 <td>{{ dish.category }}</td>
                                 <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                <td>
+                                    <form method="post">
+                                        {{ delete_form.csrf_token }}
+                                        {{ delete_form.delete_id(value=dish.id) }}
+                                        {{ delete_form.delete(class="btn btn-danger") }}
+                                    </form>
+                                </td>
                             </tr>
                             {% endif %}
                         {% endfor %}

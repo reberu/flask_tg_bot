@@ -14,9 +14,7 @@ class LoginForm(FlaskForm):
 class DishForm(FlaskForm):
     name = StringField("Наименование", validators=[DataRequired()])
     cost = IntegerField("Стоимость", validators=[DataRequired()])
-    # description = StringField("Описание", validators=[DataRequired()])
     composition = StringField("Состав", validators=[DataRequired()])
-    # img_link = StringField("Сссылка на изображение", validators=[DataRequired()])
     img_file = FileField("Загрузите изображение", validators=[DataRequired()])
     category = StringField("Категория", validators=[DataRequired()])
     id_rest = HiddenField("Идентификатор ресторана")
@@ -27,3 +25,8 @@ class CategoryForm(FlaskForm):
     name = StringField("Наименование", validators=[DataRequired()])
     restaurant_id = HiddenField("Идентификатор ресторана")
     submit = SubmitField("Добавить")
+
+
+class DeleteForm(FlaskForm):
+    delete_id = HiddenField("Hidden dish id")
+    delete = SubmitField("Delete")
