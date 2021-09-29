@@ -8,7 +8,7 @@ from flask import render_template, flash, redirect, url_for
 from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, KeyboardButton
 from telegram import error
 
-from forms import LoginForm, DishForm, CategoryForm, DeleteForm
+from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm
 from settings import BOT_TOKEN, BASE_URL
 
 import re
@@ -1160,8 +1160,15 @@ def logout():
 def admin():
     dishes = db.session.query(Dish).all()
     restaurants = db.session.query(Restaurant).all()
-    dish_form = DishForm()
-    if dish_form.validate_on_submit():
+    if current_user.username != 'admin':
+        dish_form = DishForm(hide_rest=True)
+        category_form = CategoryForm(hide_rest_id=True)
+        category_delete_form = CategoryDeleteForm(hide_rest_id=True)
+    else:
+        dish_form = DishForm(hide_rest=False)
+        category_form = CategoryForm(hide_rest_id=False)
+        category_delete_form = CategoryDeleteForm(hide_rest_id=False)
+    if dish_form.validate_on_submit() and dish_form.dish_add_submit.data:
         name = dish_form.name.data
         cost = dish_form.cost.data
         composition = dish_form.composition.data
@@ -1186,8 +1193,8 @@ def admin():
         db.session.commit()
         flash("Блюдо добавлено", "success")
         return redirect(url_for('admin'))
-    category_form = CategoryForm()
-    if category_form.validate_on_submit():
+
+    if category_form.validate_on_submit() and category_form.category_add_submit.data:
         name = category_form.name.data
         restaurant_id = category_form.restaurant_id.data
 
@@ -1196,20 +1203,45 @@ def admin():
         db.session.commit()
         flash("Категория добавлена", "success")
         return redirect(url_for('admin'))
-    delete_form = DeleteForm()
-    if delete_form.validate_on_submit():
-        dish_id = delete_form.delete_id.data
+
+    dish_delete_form = DishDeleteForm()
+    if dish_delete_form.validate_on_submit() and dish_delete_form.delete.data:
+        dish_id = dish_delete_form.delete_id.data
         db.session.query(Dish).filter_by(id=dish_id).delete()
         db.session.commit()
         flash("Блюдо успешно удалено", "success")
         return redirect(url_for('admin'))
+
+    restaurant_form = RestaurantForm()
+    if restaurant_form.validate_on_submit() and restaurant_form.rest_add_submit.data:
+        name = restaurant_form.name.data
+        address = restaurant_form.address.data
+        contact = restaurant_form.contact.data
+        passwd = restaurant_form.contact.data
+        service_uid = restaurant_form.service_uid.data
+        restaurant = Restaurant(name=name, address=address, contact=contact, passwd=passwd, service_uid=service_uid)
+        db.session.add(restaurant)
+        db.session.commit()
+        flash("Ресторан добавлен", "success")
+        return redirect(url_for('admin'))
+
+    if category_delete_form.validate_on_submit() and category_delete_form.category_delete_submit.data:
+        name = category_delete_form.name.data
+        restaurant_id = category_delete_form.restaurant_id.data
+        db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
+        db.session.commit()
+        flash("Категория успешно удалена", "success")
+        return redirect(url_for('admin'))
+
     return render_template(
         'admin.html',
         dishes=dishes,
         restaurants=restaurants,
         dish_form=dish_form,
         category_form=category_form,
-        delete_form=delete_form
+        delete_form=dish_delete_form,
+        restaurant_form=restaurant_form,
+        category_delete_form=category_delete_form
     )
 
 
