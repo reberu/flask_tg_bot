@@ -2,13 +2,14 @@ from datetime import datetime, timedelta
 from os import mkdir
 from os.path import isdir
 
+import pytz
 import telegram.error
 from flask import render_template, flash, redirect, url_for
 from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, KeyboardButton
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DeleteForm
-from settings import BOT_TOKEN
+from settings import BOT_TOKEN, BASE_URL
 
 import re
 import requests
@@ -172,8 +173,8 @@ def index():
                         text = f'{rest_name}\n'
                         text += f'<a href="{sql_result[cur_id].img_link}">.</a>'
                         text += f'\n<b>{dish_name}</b>'
-                        text += f'\nСостав: {sql_result[cur_id].composition}'
-                        text += f'\nСтоимость - {sql_result[cur_id].cost} р.'
+                        text += f'\n{sql_result[cur_id].composition}'
+                        text += f'\n{sql_result[cur_id].cost} р.'
 
                         dish_id = sql_result[cur_id].id
                         try:
@@ -215,8 +216,8 @@ def index():
                             text = f'{rest_name}\n'
                             text += f'<a href="{dish.img_link}">.</a>'
                             text += f'\n<b>{dish.name}</b>'
-                            text += f'\nСостав: {dish.composition}'
-                            text += f'\nСтоимость - {dish.cost} р.'
+                            text += f'\n{dish.composition}'
+                            text += f'\n{dish.cost} р.'
 
                             try:
                                 cart_count = db.session.query(Cart.quantity).filter_by(user_uid=chat_id,
@@ -308,8 +309,8 @@ def index():
                                 dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
                                 text += f'<a href="{dish.img_link}">{rest}</a>'
                                 text += dish.name
-                                text += f'\nСостав: {dish.composition}'
-                                text += f'\nСтоимость - {dish.cost}'
+                                text += f'\n{dish.composition}'
+                                text += f'\n{dish.cost}'
                                 buttons.append(cart_buttons)
                                 buttons.append([
                                     InlineKeyboardButton('-',
@@ -386,8 +387,8 @@ def index():
                                         dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
                                         text += f'<a href="{dish.img_link}">{rest}</a>'
                                         text += f'{dish.name}\n'
-                                        text += f'\nСостав: {dish.composition}'
-                                        text += f'\nСтоимость - {dish.cost}'
+                                        text += f'\n{dish.composition}'
+                                        text += f'\n{dish.cost}'
                                         buttons.append(cart_buttons)
                                         buttons.append([
                                             InlineKeyboardButton('-',
@@ -441,8 +442,8 @@ def index():
 
                         text += f'<a href="{dish.img_link}">{rest}</a>\n'
                         text += dish.name
-                        text += f'\nСостав: {dish.composition}'
-                        text += f'\nСтоимость - {dish.cost}'
+                        text += f'\n{dish.composition}'
+                        text += f'\n{dish.cost}'
                         buttons.append(cart_buttons)
                         buttons.append([
                             InlineKeyboardButton('-',
@@ -475,7 +476,7 @@ def index():
                                 parse_mode=ParseMode.HTML
                             )
                 elif re.search(r'(^cart_confirm$)', data):
-                    text = 'Укажите адрес доставки'
+                    text = 'Укажите только адрес доставки без номера телефона. Можете написать так же ваши пожелания.'
                     BOT.send_message(text=text, chat_id=chat_id)
                     write_history(message_id, chat_id, text, is_bot=True)
 
@@ -501,6 +502,10 @@ def index():
                         )
                         db.session.add(order)
                         db.session.flush()
+                        rest_name = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
+                        text = f'Заказ оформлен, ждем подтверждения ресторана {rest_name}'
+                        BOT.send_message(chat_id=order.uid, text=text)
+
                         text = f'Поступил заказ № {order.id}\n'
                         text += 'Состав заказа:\n'
                         for item in cart:
@@ -519,7 +524,6 @@ def index():
                         service_uid = db.session.query(Restaurant.service_uid).filter_by(
                             id=order.order_rest_id).first()[0]
                         db.session.commit()
-                        BOT.send_message(chat_id=chat_id, text='Заказ оформлен')
                         cb_data = f'order_change_{order.id}'
                         buttons = [
                             [InlineKeyboardButton('Принять и доставить за 30 минут',
@@ -544,7 +548,8 @@ def index():
                     order = db.session.query(Order).filter_by(id=order_id).first()
                     text = f'Ресторан принял ваш заказ № {order.id} и доставит '
                     time_text = ''
-                    sched_time = datetime.now() + timedelta(minutes=time)
+                    current_tz = pytz.timezone('Asia/Yakutsk')
+                    sched_time = current_tz.localize(datetime.now() + timedelta(minutes=time))
                     if time == 30:
                         time_text += 'в течении 30 минут'
                     elif time == 60:
@@ -677,9 +682,13 @@ def index():
                     cb_data = f'order_change_{order.id}'
                     details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
                     total = sum(list(map(lambda good: good.order_dish_cost * good.order_dish_quantity, details)))
+                    rest_name = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
                     service_uid = db.session.query(Restaurant.service_uid).filter_by(
                         id=order.order_rest_id).first()[0]
                     if data.split('_')[2] != 'user':
+                        text = f'Заказ оформлен, ждем подтверждения ресторана {rest_name}'
+                        BOT.send_message(chat_id=order.uid, text=text)
+
                         text = f'Поступил заказ № {order.id}\n'
                         text += 'Состав заказа:\n'
                         for item in details:
@@ -732,7 +741,7 @@ def index():
                     order = db.session.query(Order).filter_by(id=int(data.split('_')[1])).first()
                     details = db.session.query(OrderDetail).filter_by(order_id=int(data.split('_')[1])).all()
                     rest = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
-                    text = f'<b>Ресторан {rest} изменил Ваш заказ</b>\n'
+                    text = f'<b>В связи с отсутствием одного из блюд, ресторан {rest} изменил Ваш заказ</b>\n'
                     text += 'Состав Вашего заказа:\n'
                     buttons = []
                     for item in details:
@@ -797,8 +806,8 @@ def index():
                     dish = db.session.query(Dish).filter_by(id=cart[0].dish_id).first()
                     text = '<b>Корзина</b>\n'
                     text += f'<a href="{dish.img_link}">{rest}</a>'
-                    text += f'\nСостав: {dish.composition}'
-                    text += f'\nСтоимость - {cart[0].price}'
+                    text += f'\n{dish.composition}'
+                    text += f'\n{cart[0].price}'
                     BOT.send_message(
                         text=text,
                         chat_id=order.uid,
@@ -956,8 +965,8 @@ def index():
 
                                 if dish.id == cart_dish_id:
                                     text += f'<a href="{dish.img_link}">{rest}</a>'
-                                    text += f'\nСостав: {dish.composition}'
-                                    text += f'\nСтоимость - {cart[0].price}'
+                                    text += f'\n{dish.composition}'
+                                    text += f'\n{cart[0].price}'
                             buttons.append(cart_buttons)
                             buttons.append([
                                 InlineKeyboardButton('-️',
@@ -1054,8 +1063,8 @@ def index():
 
                                     if dish.id == cart_dish_id:
                                         text += f'<a href="{dish.img_link}">{order.order_rest_id}</a>'
-                                        text += f'\nСостав: {dish.composition}'
-                                        text += f'\nСтоимость - {cart[0].price}'
+                                        text += f'\n{dish.composition}'
+                                        text += f'\n{cart[0].price}'
                                 buttons.append(cart_buttons)
                                 buttons.append([
                                     InlineKeyboardButton('-️',
@@ -1080,12 +1089,12 @@ def index():
                                     parse_mode=ParseMode.HTML
                                 )
                                 return 'Order change'
-                            elif bot_msg == 'Укажите адрес доставки':
-                                text = 'Отправить номер телефона'
-                                
+                            elif bot_msg == 'Укажите только адрес доставки без номера телефона. Можете написать так ' \
+                                            'же ваши пожелания.':
+                                text = 'Укажите номер телефона'
                                 BOT.send_message(chat_id=chat_id, text=text)
                                 write_history(message_id, chat_id, text, is_bot=True)
-                            elif bot_msg == 'Укажите номер телефона' or 'Вы указали некорректный номер телефона':
+                            elif bot_msg == 'Укажите номер телефона':
                                 bot_msg = db.session.query(History).filter_by(message_id=message_id - 2,
                                                                               is_bot=False).first().message_text
                                 cur_usr = db.session.query(User).filter_by(uid=chat_id).first()
@@ -1158,13 +1167,11 @@ def admin():
         composition = dish_form.composition.data
         id_rest = dish_form.id_rest.data
         img_file = secure_filename(dish_form.img_file.data.filename)
-        # Поменять localhost на актуальное доменное имя или ip адрес
-        base_url = 'http://ba9c-94-245-132-241.ngrok.io/'
         static_path = 'static/' + str(id_rest) + '/'
         if not isdir(static_path):
             mkdir(static_path)
         dish_form.img_file.data.save(static_path + img_file)
-        img_link = base_url + static_path + img_file
+        img_link = BASE_URL + static_path + img_file
         category = dish_form.category.data
 
         dish = Dish(
