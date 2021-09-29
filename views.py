@@ -9,7 +9,7 @@ from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeybo
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DeleteForm
-from settings import BOT_TOKEN
+from settings import BOT_TOKEN, BASE_URL
 
 import re
 import requests
@@ -1167,13 +1167,11 @@ def admin():
         composition = dish_form.composition.data
         id_rest = dish_form.id_rest.data
         img_file = secure_filename(dish_form.img_file.data.filename)
-        # Поменять localhost на актуальное доменное имя или ip адрес
-        base_url = 'http://ba9c-94-245-132-241.ngrok.io/'
         static_path = 'static/' + str(id_rest) + '/'
         if not isdir(static_path):
             mkdir(static_path)
         dish_form.img_file.data.save(static_path + img_file)
-        img_link = base_url + static_path + img_file
+        img_link = BASE_URL + static_path + img_file
         category = dish_form.category.data
 
         dish = Dish(
