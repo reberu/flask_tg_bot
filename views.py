@@ -912,10 +912,11 @@ def index():
                         markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
                         BOT.send_message(chat_id, text, reply_markup=markup)
                     elif parse_text(message) == '/my_orders':
-                        order = db.session.query(Order).filter_by(uid=chat_id, order_state='Подтвержден').first()
+                        order = db.session.query(Order).filter_by(uid=chat_id, order_state='Подтверждена').order_by(Order.id.desc()).first()
                         if order:
                             details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
-                            date = datetime.utcfromtimestamp(order.order_datetime).strftime('%d.%m.%Y %H:%M:%S')
+                            current_tz = pytz.timezone('Asia/Yakutsk')
+                            date = current_tz.localize(datetime.now()).strftime('%d.%m.%Y %H:%M:%S')
                             text = f'Ваш заказ № {order.id} от {date}\n'
                             for item in details:
                                 text += f'- {item.order_dish_name}\n'
