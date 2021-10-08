@@ -827,42 +827,9 @@ def index():
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
                     stat_data = db.session.query(Order).all()
-                    months = {
-                        1: 'январь',
-                        2: 'февраль',
-                        3: 'март',
-                        4: 'апрель',
-                        5: 'май',
-                        6: 'июнь',
-                        7: 'июль',
-                        8: 'август',
-                        9: 'сентябрь',
-                        10: 'октябрь',
-                        11: 'ноябрь',
-                        12: 'декабрь'
-                    }
-                    if stat_id == 1:
-                        current_month = datetime.now().month
-                        current_month_total = 0
-                        current_month_rests_total = {}
-                        stat_data = db.session.query(Order).all()
-                        for data in stat_data:
-                            order_date = int(datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
-                            if order_date == current_month:
-                                current_month_total += data.order_total
-                                rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
-                                try:
-                                    current_month_rests_total.update(
-                                        {rest: current_month_rests_total[rest] + data.order_total}
-                                    )
-                                except KeyError:
-                                    current_month_rests_total.update({rest: data.order_total})
-                        text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
-                        for item in current_month_rests_total:
-                            text += f'Общая сумма заказов в ресторане {item} за {months[current_month]} - ' \
-                                    f'{current_month_rests_total[item]}р.\n'
 
-                        BOT.send_message(chat_id=chat_id, text=text)
+                    if stat_id == 1:
+                        BOT.send_message(chat_id=chat_id, text=stat1())
                     elif stat_id == 2:
                         BOT.send_message(chat_id=chat_id, text=f'Количество заказов по ресторанам\n{stat_data}')
                     elif stat_id == 3:
@@ -1242,7 +1209,10 @@ def admin():
         category_form=category_form,
         delete_form=dish_delete_form,
         restaurant_form=restaurant_form,
-        category_delete_form=category_delete_form
+        category_delete_form=category_delete_form,
+        stat1=stat1(),
+        stat6=stat6(),
+        stat7=stat7()
     )
 
 
@@ -1316,3 +1286,48 @@ def write_history(msg_id, chat_id, text, is_bot):
     )
     db.session.add(msg)
     db.session.commit()
+
+
+def stat1():
+    months = {
+        1: 'январь',
+        2: 'февраль',
+        3: 'март',
+        4: 'апрель',
+        5: 'май',
+        6: 'июнь',
+        7: 'июль',
+        8: 'август',
+        9: 'сентябрь',
+        10: 'октябрь',
+        11: 'ноябрь',
+        12: 'декабрь'
+    }
+    current_month = datetime.now().month
+    current_month_total = 0
+    current_month_rests_total = {}
+    stat_data = db.session.query(Order).all()
+    for data in stat_data:
+        order_date = int(datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
+        if order_date == current_month:
+            current_month_total += data.order_total
+            rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
+            try:
+                current_month_rests_total.update(
+                    {rest: current_month_rests_total[rest] + data.order_total}
+                )
+            except KeyError:
+                current_month_rests_total.update({rest: data.order_total})
+    text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
+    for item in current_month_rests_total:
+        text += f'Общая сумма заказов в ресторане {item} за {months[current_month]} - ' \
+                f'{current_month_rests_total[item]}р.\n'
+    return text
+
+
+def stat6():
+    return db.session.query(Order).filter_by(order_state="Отменен").count()
+
+
+def stat7():
+    return db.session.query(User.id).count()

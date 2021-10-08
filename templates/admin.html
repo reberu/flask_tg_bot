@@ -267,6 +267,64 @@
                     </div>
                 </div>
             </div>
+            <div class="card">
+                <div class="card-header" id="headingStat">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseStat" aria-expanded="false" aria-controls="collapseStat">
+                            Статистика
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseStat" class="collapse" aria-labelledby="headingStat" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <div>Количество заказов в сумме отдельно по ресторанам и в общем полная сумма по всем ресторанам за месяц.</div>
+                        <button id="btnStat1">Показать</button>
+                        <div class="stat1" style="display:none;">{{ stat1 }}</div>
+                        <div style="margin-top:15px;">Количество заказов по ресторанам по дням, неделям, в месяце.</div>
+                        <button id="btnStat2">Показать</button>
+                        <div class="stat2" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Количество заказов в общем по дням, неделям, в месяце.</div>
+                        <button id="btnStat3">Показать</button>
+                        <div class="stat3" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Статистика заказов блюд, какие блюда часто заказывают, какие меньше - суши, пиццу, горячее.</div>
+                        <button id="btnStat4">Показать</button>
+                        <div class="stat4" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Количество изменений в заказе.</div>
+                        <button id="btnStat5">Показать</button>
+                        <div class="stat5" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Количество отмен заказов.</div>
+                        <button id="btnStat6">Показать</button>
+                        <div class="stat6" style="display:none;">Количество отмененных заказов - {{ stat6 }}</div>
+                        <div style="margin-top:15px;">Количество уникальных посетителей.</div>
+                        <button id="btnStat7">Показать</button>
+                        <div class="stat7" style="display:none;">Количество уникальных пользователей - {{ stat7 }}</div>
+                        <script>
+                            $(document).ready(function() {
+                                $("#btnStat1").click(function(){
+                                    $(".stat1").toggle();
+                                });
+                                $("#btnStat2").click(function(){
+                                    $(".stat2").toggle();
+                                });
+                                $("#btnStat3").click(function(){
+                                    $(".stat3").toggle();
+                                });
+                                $("#btnStat4").click(function(){
+                                    $(".stat4").toggle();
+                                });
+                                $("#btnStat5").click(function(){
+                                    $(".stat5").toggle();
+                                });
+                                $("#btnStat6").click(function(){
+                                    $(".stat6").toggle();
+                                });
+                                $("#btnStat7").click(function(){
+                                    $(".stat7").toggle();
+                                });
+                            });
+                        </script>
+                    </div>
+                </div>
         </div>
     {% endif %}
 
