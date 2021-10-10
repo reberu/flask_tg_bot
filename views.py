@@ -1211,6 +1211,7 @@ def admin():
         restaurant_form=restaurant_form,
         category_delete_form=category_delete_form,
         stat1=stat1(),
+        stat2=stat2(),
         stat6=stat6(),
         stat7=stat7()
     )
@@ -1319,9 +1320,29 @@ def stat1():
             except KeyError:
                 current_month_rests_total.update({rest: data.order_total})
     text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
-    for item in current_month_rests_total:
-        text += f'Общая сумма заказов в ресторане {item} за {months[current_month]} - ' \
-                f'{current_month_rests_total[item]}р.\n'
+    for rest in current_month_rests_total:
+        text += f'Общая сумма заказов в ресторане {rest} за {months[current_month]} - ' \
+                f'{current_month_rests_total[rest]}р.\n'
+    return text
+
+
+def stat2():
+    current_month = datetime.now().month
+    stat_data = db.session.query(Order).order_by(Order.order_rest_id).all()
+    rests_data, text = [], ''
+    for data in stat_data:
+        month = int(datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
+        if month == current_month:
+            rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
+            day = str(datetime.utcfromtimestamp(data.order_datetime).strftime("%d"))
+            rests_data.append([rest, day, data.order_total, month])
+    for i in range(len(rests_data)):
+        print(rests_data[i])
+        if i == 0 or (i != 0 and rests_data[i][0] != rests_data[i-1][0]):
+            text += f'{rests_data[i][0]}\n'
+            text += f'{rests_data[i][1]}.{rests_data[i][3]} - {rests_data[i][2]} р.\n'
+        elif i != 0 and rests_data[i][0] == rests_data[i-1][0]:
+            text += f'{rests_data[i][1]}.{rests_data[i][3]} - {rests_data[i][2]} р.\n'
     return text
 
 
