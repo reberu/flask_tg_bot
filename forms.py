@@ -1,7 +1,10 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
-from wtforms import StringField, SubmitField, BooleanField, PasswordField, IntegerField, HiddenField, widgets
+from wtforms import StringField, SubmitField, BooleanField, PasswordField, IntegerField, HiddenField, widgets, \
+    SelectField
 from wtforms.validators import DataRequired
+from app import db
+from models import *
 
 
 class LoginForm(FlaskForm):
@@ -41,7 +44,7 @@ class CategoryForm(FlaskForm):
 
 class DishDeleteForm(FlaskForm):
     delete_id = HiddenField("Hidden dish id")
-    delete = SubmitField("Удалить")
+    dish_delete_submit = SubmitField("Удалить")
 
 
 class RestaurantForm(FlaskForm):
@@ -53,8 +56,25 @@ class RestaurantForm(FlaskForm):
     rest_add_submit = SubmitField("Добавить")
 
 
+class RestaurantEditForm(FlaskForm):
+    id = HiddenField("Hidden restaurant id field")
+    name = StringField("Название")
+    address = StringField("Адрес")
+    contact = StringField("Контактный номер")
+    passwd = StringField("Кодовая фраза")
+    rest_edit_submit = SubmitField("Отправить")
+
+
+class RestaurantDeleteForm(FlaskForm):
+    choices = [rest.name for rest in Restaurant.query.all()]
+    name = SelectField("Название", choices=choices)
+    rest_delete_submit = SubmitField("Удалить")
+
+
 class CategoryDeleteForm(FlaskForm):
-    name = StringField("Название категории", validators=[DataRequired()])
+    choices = [choice.name for choice in db.session.query(Category).all()]
+    name = SelectField("Название категории", choices=choices, validators=[DataRequired()])
+    # name = StringField("Название категории", validators=[DataRequired()])
     restaurant_id = IntegerField("Идентификатор ресторана", validators=[DataRequired()])
     category_delete_submit = SubmitField("Удалить")
 

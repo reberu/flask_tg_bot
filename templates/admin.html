@@ -1,12 +1,28 @@
 {% extends 'base.html' %}
-
+{% block script %}
+<script>
+    $(document).ready(function() {
+        for (let i = 1; i < {{ restaurants|length }} + 1; i++) {
+            $("#btnRestEdit" + i).click(function(){
+                $("#restEdit" + i).toggle();
+                console.log("restEdit"+i);
+            });
+        }
+        for (let j = 1; j < 8; j++) {
+            $("#btnStat" + j).click(function(){
+                $(".stat" + j).toggle();
+            });
+        }
+    });
+</script>
+{% endblock %}
 {% block title %}
     Панель администрирования
 {% endblock %}
 
 {% block content %}
     {% set ns = namespace (rest_id = 0) %}
-    <h2>Личный кабинет</h2>
+<h2 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">Личный кабинет</h2>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 <ul class=flashes>
@@ -37,7 +53,7 @@
                                     <div class="p-2 flex-fill bd-highlight">Категория</div>
                                     <div class="p-2 flex-fill bd-highlight">Изображение</div>
                                     <div class="p-2 flex-fill bd-highlight"></div>
-                                </div>
+                                    </div>
                                 {% for dish in dishes %}
                                     {% if dish.id_rest == restaurant.id %}
                                         <div class="d-flex justify-content-start align-items-center">
@@ -48,15 +64,44 @@
                                             <div class="p-2 flex-fill bd-highlight"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></div>
                                             <div class="p-2 flex-fill bd-highlight">
                                                 <form method="post">
-                                                    {{ delete_form.csrf_token }}
-                                                    {{ delete_form.delete_id(value=dish.id) }}
-                                                    {{ delete_form.delete(class="btn btn-danger") }}
+                                                    {{ dish_delete_form.csrf_token }}
+                                                    {{ dish_delete_form.delete_id(value=dish.id) }}
+                                                    {{ dish_delete_form.dish_delete_submit(class="btn btn-danger") }}
                                                 </form>
                                             </div>
                                         </div>
                                     {% endif %}
                                 {% endfor %}
+                                <button id="btnRestEdit{{ restaurant.id }}" type="button">Изменить данные ресторана</button>
+                                <form id="restEdit{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                    <script>
+                                        console.log("btnRestEdit{{ restaurant.id }}");
+                                        console.log("restEdit{{ restaurant.id }}");
+                                    </script>
+                                    <table>
 
+                                        {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;") }}
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.name.label }}</td>
+                                            <td>{{ restaurant_edit_form.name(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.address.label }}</td>
+                                            <td>{{ restaurant_edit_form.address(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.contact.label }}</td>
+                                            <td>{{ restaurant_edit_form.contact(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.passwd.label }}</td>
+                                            <td>{{ restaurant_edit_form.passwd(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(class="btn btn-warning") }}</td>
+                                        </tr>
+                                    </table>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -87,9 +132,9 @@
                                 <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
                                 <td>
                                     <form method="post">
-                                        {{ delete_form.csrf_token }}
-                                        {{ delete_form.delete_id(value=dish.id) }}
-                                        {{ delete_form.delete(class="btn btn-danger") }}
+                                        {{ dish_delete_form.csrf_token }}
+                                        {{ dish_delete_form.delete_id(value=dish.id) }}
+                                        {{ dish_delete_form.dish_delete_submit(class="btn btn-danger") }}
                                     </form>
                                 </td>
                             </tr>
@@ -164,21 +209,29 @@
                 <div class="card-body">
                     <form action="" method="post">
                         {{ category_form.csrf_token() }}
+
                         <table>
+                            {% if ns.rest_id != 0 %}
                             <tr>
                                 <td>{{ category_form.name.label }}</td>
                                 <td>{{ category_form.name }}</td>
                             </tr>
                             <tr>
-                                {% if ns.rest_id != 0 %}
-                                    <td>
-                                        {{ category_form.restaurant_id(value=ns.rest_id) }}
-                                    </td>
-                                {% else %}
-                                    <td>{{ category_form.restaurant_id.label }}</td>
-                                    <td>{{ category_form.restaurant_id }}</td>
-                                {% endif %}
+                                <td>
+                                    {{ category_form.restaurant_id(value=ns.rest_id) }}
+                                </td>
                             </tr>
+                            {% else %}
+                            <tr>
+                                <td>{{ category_form.restaurant_id.label }}</td>
+                                <td>{{ category_form.restaurant_id }}</td>
+                            </tr>
+                            <tr>
+                                <td>{{ category_form.name.label }}</td>
+                                <td>{{ category_form.name }}</td>
+                            </tr>
+                            {% endif %}
+
                             <tr>
                                 <td>{{ category_form.category_add_submit }}</td>
                             </tr>
@@ -202,7 +255,9 @@
                         <table>
                             <tr>
                                 <td>{{ category_delete_form.name.label }}</td>
-                                <td>{{ category_delete_form.name }}</td>
+                                <td>
+                                    {{ category_delete_form.name }}
+                                </td>
                             </tr>
                             <tr>
                                 <tr>
@@ -217,7 +272,6 @@
                             </tr>
                             <tr>
                                 <td>{{ category_delete_form.category_delete_submit }}</td>
-                            </tr>
                             </tr>
                         </table>
                     </form>
@@ -268,6 +322,31 @@
                 </div>
             </div>
             <div class="card">
+                <div class="card-header" id="headingRestDelete">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseRestDelete" aria-expanded="false" aria-controls="collapseRestDelete">
+                            Удалить ресторан
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseRestDelete" class="collapse" aria-labelledby="headingRestDelete" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data">
+                            {{ restaurant_delete_form.csrf_token() }}
+                            <table>
+                                <tr>
+                                    <td>{{ restaurant_delete_form.name.label }}</td>
+                                    <td>{{ restaurant_delete_form.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_delete_form.rest_delete_submit }}</td>
+                                </tr>
+                            </table>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
                 <div class="card-header" id="headingStat">
                     <h5 class="mb-0">
                         <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseStat" aria-expanded="false" aria-controls="collapseStat">
@@ -298,33 +377,9 @@
                         <div style="margin-top:15px;">Количество уникальных посетителей.</div>
                         <button id="btnStat7">Показать</button>
                         <div class="stat7" style="display:none;">Количество уникальных пользователей - {{ stat7 }}</div>
-                        <script>
-                            $(document).ready(function() {
-                                $("#btnStat1").click(function(){
-                                    $(".stat1").toggle();
-                                });
-                                $("#btnStat2").click(function(){
-                                    $(".stat2").toggle();
-                                });
-                                $("#btnStat3").click(function(){
-                                    $(".stat3").toggle();
-                                });
-                                $("#btnStat4").click(function(){
-                                    $(".stat4").toggle();
-                                });
-                                $("#btnStat5").click(function(){
-                                    $(".stat5").toggle();
-                                });
-                                $("#btnStat6").click(function(){
-                                    $(".stat6").toggle();
-                                });
-                                $("#btnStat7").click(function(){
-                                    $(".stat7").toggle();
-                                });
-                            });
-                        </script>
                     </div>
                 </div>
+            </div>
         </div>
     {% endif %}
 
