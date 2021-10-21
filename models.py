@@ -99,15 +99,17 @@ class Admin(db.Model, UserMixin):
     username = db.Column(db.String(50), nullable=False, unique=True)
     email = db.Column(db.String(100), nullable=False, unique=True)
     password_hash = db.Column(db.String(100), nullable=False)
-    created_on = db.Column(db.DateTime(), default=datetime.utcnow)
-    updated_on = db.Column(db.DateTime(), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_on = db.Column(db.DateTime(), default=datetime.now)
+    updated_on = db.Column(db.DateTime(), default=datetime.now, onupdate=datetime.now)
     ownership = db.Column(db.String(100))
 
-    def __repr__(self):
-        return "<{}:{}>".format(self.id, self.username)
+    @property
+    def password(self):
+        raise AttributeError('Пароль не читаем!')
 
-    def set_password(self, password):
+    @password.setter
+    def password(self, password):
         self.password_hash = generate_password_hash(password)
 
-    def check_password(self, password):
+    def verify_password(self, password):
         return check_password_hash(self.password_hash, password)

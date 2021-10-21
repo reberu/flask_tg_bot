@@ -9,7 +9,7 @@ from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeybo
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
-    RestaurantDeleteForm, RestaurantEditForm
+    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm
 from settings import BOT_TOKEN, BASE_URL
 
 import re
@@ -1085,7 +1085,7 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = db.session.query(Admin).filter(Admin.username == form.username.data).first()
-        if user and user.check_password(form.password.data):
+        if user and user.verify_password(form.password.data):
             login_user(user, remember=form.remember.data)
             return redirect(url_for('admin'))
 
@@ -1107,11 +1107,13 @@ def logout():
 def admin():
     dishes = db.session.query(Dish).all()
     restaurants = db.session.query(Restaurant).all()
+    adm = db.session.query(Admin)
     categories = db.session.query(Category).all()
     dish_delete_form = DishDeleteForm()
     restaurant_form = RestaurantForm()
     restaurant_delete_form = RestaurantDeleteForm()
     restaurant_edit_form = RestaurantEditForm()
+    admin_add_form = AdminAddForm()
     if current_user.username != 'admin':
         dish_form = DishForm(hide_rest=True)
         category_form = CategoryForm(hide_rest_id=True)
@@ -1210,6 +1212,22 @@ def admin():
             rest.passwd = passwd
         db.session.commit()
         return redirect(url_for('admin'))
+
+    elif admin_add_form.validate_on_submit() and admin_add_form.admin_add_button.data:
+        username = admin_add_form.username.data
+        passwd = admin_add_form.passwd.data
+        mail = admin_add_form.email.data
+        ownership = admin_add_form.ownership.data
+        usr = Admin(
+            username=username,
+            email=mail,
+            password=passwd,
+            ownership=ownership
+        )
+        db.session.add(usr)
+        db.session.commit()
+        return redirect(url_for('admin'))
+
     return render_template(
         'admin.html',
         dishes=dishes,
@@ -1222,6 +1240,7 @@ def admin():
         category_delete_form=category_delete_form,
         restaurant_delete_form=restaurant_delete_form,
         restaurant_edit_form=restaurant_edit_form,
+        admin_add_form=admin_add_form,
         stat1=stat1(),
         stat2=stat2(),
         stat6=stat6(),

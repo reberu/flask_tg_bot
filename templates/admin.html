@@ -5,7 +5,6 @@
         for (let i = 1; i < {{ restaurants|length }} + 1; i++) {
             $("#btnRestEdit" + i).click(function(){
                 $("#restEdit" + i).toggle();
-                console.log("restEdit"+i);
             });
         }
         for (let j = 1; j < 8; j++) {
@@ -74,12 +73,8 @@
                                 {% endfor %}
                                 <button id="btnRestEdit{{ restaurant.id }}" type="button">Изменить данные ресторана</button>
                                 <form id="restEdit{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
-                                    <script>
-                                        console.log("btnRestEdit{{ restaurant.id }}");
-                                        console.log("restEdit{{ restaurant.id }}");
-                                    </script>
                                     <table>
-
+                                        {{ restaurant_edit_form.csrf_token }}
                                         {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;") }}
                                         <tr>
                                             <td>{{ restaurant_edit_form.name.label }}</td>
@@ -377,6 +372,43 @@
                         <div style="margin-top:15px;">Количество уникальных посетителей.</div>
                         <button id="btnStat7">Показать</button>
                         <div class="stat7" style="display:none;">Количество уникальных пользователей - {{ stat7 }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header" id="adminAdd">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminAdd" aria-expanded="false" aria-controls="collapseAdminAdd">
+                            Добавить пользователя
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseAdminAdd" class="collapse" aria-labelledby="adminAdd" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <form method="POST" enctype="multipart/form-data">
+                            <table>
+                                {{ admin_add_form.csrf_token }}
+                                <tr>
+                                    <td>{{ admin_add_form.username.label }}</td>
+                                    <td>{{ admin_add_form.username(size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.passwd.label }}</td>
+                                    <td>{{ admin_add_form.passwd(type="password", size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.email.label }}</td>
+                                    <td>{{ admin_add_form.email(type="email", size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.ownership.label }}</td>
+                                    <td>{{ admin_add_form.ownership(size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.admin_add_button(class="btn btn-success") }}</td>
+                                </tr>
+                            </table>
+                        </form>
                     </div>
                 </div>
             </div>

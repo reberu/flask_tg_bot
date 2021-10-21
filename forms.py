@@ -83,3 +83,11 @@ class CategoryDeleteForm(FlaskForm):
         super(CategoryDeleteForm, self).__init__(*args, **kwargs)
         if hide_id:
             self.restaurant_id.widget = widgets.HiddenInput()
+
+
+class AdminAddForm(FlaskForm):
+    username = StringField("Логин", validators=[DataRequired()])
+    passwd = StringField("Пароль", validators=[DataRequired()])
+    email = StringField("Почта", validators=[DataRequired()])
+    ownership = StringField("Наименование ресторана")
+    admin_add_button = SubmitField("Создать")
