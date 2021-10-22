@@ -36,14 +36,14 @@
             {% for restaurant in restaurants %}
                 <div class="accordion" id="accordionRests">
                     <div class="card">
-                        <div class="card-header" id="heading{{ restaurant.name }}">
+                        <div class="card-header" id="heading{{ restaurant.id }}">
                             <h5 class="mb-0">
-                                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapse{{ restaurant.name }}" aria-expanded="false" aria-controls="collapse{{ restaurant.name }}">
+                                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapse{{ restaurant.id }}" aria-expanded="false" aria-controls="collapse{{ restaurant.id }}">
                                     {{ restaurant.name }}
                                 </button>
                             </h5>
                         </div>
-                        <div id="collapse{{ restaurant.name }}" class="collapse" aria-labelledby="heading{{ restaurant.name }}" data-parent="#accordionRests">
+                        <div id="collapse{{ restaurant.id }}" class="collapse" aria-labelledby="heading{{ restaurant.id }}" data-parent="#accordionRests">
                             <div class="card-body">
                                 <div class="d-flex justify-content-start align-items-center">
                                     <div class="p-2 flex-fill bd-highlight">Название блюда</div>

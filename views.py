@@ -670,7 +670,7 @@ def index():
                     rest_name = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
                     service_uid = db.session.query(Restaurant.service_uid).filter_by(
                         id=order.order_rest_id).first()[0]
-                    if data.split('_')[2] != 'user':
+                    if re.search(r'(^order_[0-9]+_user_confirm$)', data):
                         text = f'Заказ оформлен, ждем подтверждения ресторана {rest_name}'
                         BOT.send_message(chat_id=order.uid, text=text)
 
@@ -692,9 +692,8 @@ def index():
                             [InlineKeyboardButton('Не принят', callback_data='None')],
                             [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                         ]
-                        BOT.editMessageText(
+                        BOT.sendMessage(
                             chat_id=service_uid,
-                            message_id=message_id,
                             text=text,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
@@ -725,8 +724,9 @@ def index():
                 elif re.search(r'^order_[0-9]+_send2user$', data):
                     order = db.session.query(Order).filter_by(id=int(data.split('_')[1])).first()
                     details = db.session.query(OrderDetail).filter_by(order_id=int(data.split('_')[1])).all()
-                    rest = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
-                    text = f'<b>В связи с отсутствием одного из блюд, ресторан {rest} изменил Ваш заказ</b>\n'
+                    rest = db.session.query(Restaurant).filter_by(id=order.order_rest_id).first()
+                    BOT.sendMessage(text='Отправлен измененный заказ', chat_id=rest.service_uid)
+                    text = f'<b>В связи с отсутствием одного из блюд, ресторан {rest.name} изменил Ваш заказ</b>\n'
                     text += 'Состав Вашего заказа:\n'
                     buttons = []
                     for item in details:
