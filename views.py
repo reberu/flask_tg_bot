@@ -8,7 +8,8 @@ from flask import render_template, flash, redirect, url_for
 from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, KeyboardButton
 from telegram import error
 
-from forms import LoginForm, DishForm, CategoryForm, DeleteForm
+from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
+    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm
 from settings import BOT_TOKEN, BASE_URL
 
 import re
@@ -23,6 +24,8 @@ from app import app, db, sched, login_manager
 from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin
 
 from werkzeug.utils import secure_filename
+
+from transliterate import translit
 
 BOT = Bot(BOT_TOKEN)
 URL = f'https://api.telegram.org/bot{BOT_TOKEN}/'
@@ -62,7 +65,6 @@ def index():
             # Callback handlers
             if get_value("callback_query", r):
                 data = r['callback_query']['data']
-                print('callback - ', data)
                 buttons = []
                 message_id = r['callback_query']['message']['message_id']
                 if re.search(r'(restaurant_[0-9]+$)|'
@@ -97,7 +99,6 @@ def index():
                 elif re.search(r'(restaurant_[0-9]+_cat[0-9]+$)', data) \
                         or re.search(r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_add_[0-9]+_[0-9]+$)', data) \
                         or re.search(r'(restaurant_[0-9]+_cat[0-9]+_dish_[0-9]+_rem_[0-9]+_[0-9]+$)', data):
-                    print('restaurant callback', data)
                     rest_id, cat_id = int(data.split('_')[1]), int(data.split('_')[2][3:])
                     category = db.session.query(Category.name).filter_by(id=cat_id).first()[0]
                     rest_name = db.session.query(Restaurant.name).filter_by(id=rest_id).first()[0]
@@ -113,14 +114,12 @@ def index():
                             if item.id == dish_id:
                                 dish_name = item.name
                                 cur_id = i
-                        print(dish_name, cur_chat_id, data.split('_')[1])
                         try:
                             dish_count = db.session.query(Cart.quantity).filter_by(name=dish_name, user_uid=cur_chat_id,
                                                                                    restaurant_id=data.split('_')[
                                                                                        1]).first()[0]
                         except TypeError:
                             dish_count = 0
-                        print(cur_id, cur_chat_id, cur_msg_id, dish_count)
                         if data.split('_')[5] == 'add':
                             if dish_count and dish_count > 0:
                                 cart_item_updater = db.session.query(Cart).filter_by(
@@ -130,7 +129,6 @@ def index():
                                 cart_item_updater.quantity += 1
                                 db.session.commit()
                             else:
-                                print('add new item')
                                 cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
                                 rest_id = int(data.split('_')[1])
                                 text = ''
@@ -158,7 +156,6 @@ def index():
                                     BOT.sendMessage(chat_id=chat_id, text=text)
                         elif data.split('_')[5] == 'rem':
                             if dish_count and dish_count > 1:
-                                print('UPDATE')
                                 cart_item_updater = db.session.query(Cart).filter_by(
                                     name=sql_result[cur_id].name,
                                     user_uid=cur_chat_id,
@@ -166,7 +163,6 @@ def index():
                                 cart_item_updater.quantity -= 1
                                 db.session.commit()
                             elif dish_count and dish_count == 1:
-                                print('DELETE')
                                 db.session.query(Cart).filter_by(name=dish_name, user_uid=cur_chat_id,
                                                                  restaurant_id=data.split('_')[1]).delete()
                                 db.session.commit()
@@ -184,7 +180,6 @@ def index():
                             cart_count = 0
                         except IndexError:
                             cart_count = 0
-                        print('cart_count', dish_name, cart_count)
                         cb_data_first = f'restaurant_{rest_id}_cat{cat_id}_dish_{dish_id}'
                         cb_data_last = f'{cur_chat_id}_{message_id}'
                         buttons = [[
@@ -210,7 +205,6 @@ def index():
                             reply_markup=InlineKeyboardMarkup(buttons),
                             parse_mode=ParseMode.HTML
                         )
-                        print(dish_id, dish_name, dish_count)
                     else:
                         for current_id, dish in enumerate(sql_result, start=1):
                             text = f'{rest_name}\n'
@@ -226,7 +220,6 @@ def index():
                                 cart_count = 0
                             except IndexError:
                                 cart_count = 0
-                            print(dish)
                             cb_data_first = f'restaurant_{rest_id}_cat{cat_id}_dish_{dish.id}'
                             cb_data_last = f'{chat_id}_{message_id + current_id}'
                             buttons = [[
@@ -236,7 +229,6 @@ def index():
                                 InlineKeyboardButton('+️',
                                                      callback_data=f'{cb_data_first}_add_{cb_data_last}')
                             ]]
-                            print(message_id + current_id)
                             total = 0
 
                             cart_items = db.session.query(Cart).filter_by(user_uid=chat_id).all()
@@ -254,8 +246,6 @@ def index():
                                 reply_markup=InlineKeyboardMarkup(buttons),
                                 parse_mode=ParseMode.HTML
                             )
-                            # write_history(message_id, chat_id, text, is_bot=True)
-                            print(dish.id, dish.name, cart_count)
                 elif re.search(r'(^cart$)|'
                                r'(^cart_id_[0-9]+$)|'
                                r'(^cart_id_[0-9]+_clear$)|'
@@ -286,7 +276,6 @@ def index():
                                     for item in cart:
                                         if current_id == item.id:
                                             cart_count = item.quantity
-                                    print('cart_count', cart_count)
                                 except UnboundLocalError:
                                     print("UnboundLocalError: local variable 'current_id' referenced before assignment")
 
@@ -365,8 +354,6 @@ def index():
                                         BOT.editMessageText(chat_id=chat_id, message_id=message_id, text=text)
                                         return 'empty cart'
                                     elif len(cart) > 1 and item.quantity == 1:
-                                        print('Cart item remove handler')
-                                        print(cart)
                                         db.session.query(Cart).filter_by(id=current_id).delete()
                                         db.session.commit()
                                         cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
@@ -415,13 +402,11 @@ def index():
                                         return "cart item removed"
                                     else:
                                         pass
-                        print('show_cart handler')
                         cart_count = None
                         try:
                             for item in cart:
                                 if current_id == item.id:
                                     cart_count = item.quantity
-                            print('cart_count', cart_count)
                         except UnboundLocalError:
                             print("UnboundLocalError: local variable 'current_id' referenced before assignment")
 
@@ -487,9 +472,9 @@ def index():
                         text='Пожалуйста, выберите ресторан:',
                         reply_markup=rest_menu_keyboard())
                 elif re.search(r'(^order_confirm$)', data):
-                    print('Order confirm')
                     cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
                     total = sum(list(map(lambda good: good.price * good.quantity, cart)))
+                    current_tz = pytz.timezone('Asia/Yakutsk')
                     try:
                         order = Order(
                             uid=chat_id,
@@ -497,7 +482,7 @@ def index():
                             last_name=last_name,
                             order_total=total,
                             order_rest_id=cart[0].restaurant_id,
-                            order_datetime=datetime.now().strftime('%s'),
+                            order_datetime=datetime.now(current_tz).strftime('%s'),
                             order_confirm=False
                         )
                         db.session.add(order)
@@ -593,17 +578,17 @@ def index():
                     text += f'на адрес: {client.address}\n'
                     text += f'Контактный номер: {client.phone}'
                     BOT.send_message(chat_id=service_uid, text=text)
-
                     order.order_confirm = True
                     order.order_state = 'Подтверждена'
                     db.session.commit()
-                    text = f'Заданное время по заказу № {order_id} закончилось. Подвтердить доставку?'
-                    buttons = [
-                        InlineKeyboardButton('Подтвердить доставку', callback_data=f'order_{order.id}_delivered')
-                    ]
-                    sched.add_job(sendMsg, 'date', run_date=sched_time, args=[service_uid, text, buttons])
-                    text = f'Заказ № {order_id} доставлен?'
-                    sched.add_job(sendMsg, 'date', run_date=sched_time, args=[client.uid, text, buttons])
+
+                    # text = f'Заданное время по заказу № {order_id} закончилось. Подвтердить доставку?'
+                    # buttons = [
+                    #     InlineKeyboardButton('Подтвердить доставку', callback_data=f'order_{order.id}_delivered')
+                    # ]
+                    # sched.add_job(sendMsg, 'date', run_date=sched_time, args=[service_uid, text, buttons])
+                    # text = f'Заказ № {order_id} доставлен?'
+                    # sched.add_job(sendMsg, 'date', run_date=sched_time, args=[client.uid, text, buttons])
                 elif re.search(r'^order_change_[0-9]+$', data):
                     order_id = int(data.split('_')[2])
                     order = db.session.query(Order).filter_by(id=order_id).first()
@@ -685,7 +670,7 @@ def index():
                     rest_name = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
                     service_uid = db.session.query(Restaurant.service_uid).filter_by(
                         id=order.order_rest_id).first()[0]
-                    if data.split('_')[2] != 'user':
+                    if re.search(r'(^order_[0-9]+_user_confirm$)', data):
                         text = f'Заказ оформлен, ждем подтверждения ресторана {rest_name}'
                         BOT.send_message(chat_id=order.uid, text=text)
 
@@ -707,9 +692,8 @@ def index():
                             [InlineKeyboardButton('Не принят', callback_data='None')],
                             [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                         ]
-                        BOT.editMessageText(
+                        BOT.sendMessage(
                             chat_id=service_uid,
-                            message_id=message_id,
                             text=text,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
@@ -740,8 +724,9 @@ def index():
                 elif re.search(r'^order_[0-9]+_send2user$', data):
                     order = db.session.query(Order).filter_by(id=int(data.split('_')[1])).first()
                     details = db.session.query(OrderDetail).filter_by(order_id=int(data.split('_')[1])).all()
-                    rest = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
-                    text = f'<b>В связи с отсутствием одного из блюд, ресторан {rest} изменил Ваш заказ</b>\n'
+                    rest = db.session.query(Restaurant).filter_by(id=order.order_rest_id).first()
+                    BOT.sendMessage(text='Отправлен измененный заказ', chat_id=rest.service_uid)
+                    text = f'<b>В связи с отсутствием одного из блюд, ресторан {rest.name} изменил Ваш заказ</b>\n'
                     text += 'Состав Вашего заказа:\n'
                     buttons = []
                     for item in details:
@@ -827,42 +812,9 @@ def index():
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
                     stat_data = db.session.query(Order).all()
-                    months = {
-                        1: 'январь',
-                        2: 'февраль',
-                        3: 'март',
-                        4: 'апрель',
-                        5: 'май',
-                        6: 'июнь',
-                        7: 'июль',
-                        8: 'август',
-                        9: 'сентябрь',
-                        10: 'октябрь',
-                        11: 'ноябрь',
-                        12: 'декабрь'
-                    }
-                    if stat_id == 1:
-                        current_month = datetime.now().month
-                        current_month_total = 0
-                        current_month_rests_total = {}
-                        stat_data = db.session.query(Order).all()
-                        for data in stat_data:
-                            order_date = int(datetime.utcfromtimestamp(data.order_datetime).strftime("%m"))
-                            if order_date == current_month:
-                                current_month_total += data.order_total
-                                rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
-                                try:
-                                    current_month_rests_total.update(
-                                        {rest: current_month_rests_total[rest] + data.order_total}
-                                    )
-                                except KeyError:
-                                    current_month_rests_total.update({rest: data.order_total})
-                        text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
-                        for item in current_month_rests_total:
-                            text += f'Общая сумма заказов в ресторане {item} за {months[current_month]} - ' \
-                                    f'{current_month_rests_total[item]}р.\n'
 
-                        BOT.send_message(chat_id=chat_id, text=text)
+                    if stat_id == 1:
+                        BOT.send_message(chat_id=chat_id, text=stat1())
                     elif stat_id == 2:
                         BOT.send_message(chat_id=chat_id, text=f'Количество заказов по ресторанам\n{stat_data}')
                     elif stat_id == 3:
@@ -879,7 +831,6 @@ def index():
             else:
                 # write message handlers
                 try:
-                    print('message!')
                     message = r['message']['text']
                     message_id = r['message']['message_id']
                     if r["message"]["chat"]["first_name"] != '':
@@ -891,8 +842,6 @@ def index():
                                                                       is_bot=True).first().message_text
                     except AttributeError:
                         bot_msg = None
-                    print('bot message: ', bot_msg)
-                    print('parse text state - ', parse_text(message))
                     restaurants = db.session.query(Restaurant).all()
                     for rest in restaurants:
                         if message == rest.passwd:
@@ -912,11 +861,14 @@ def index():
                         markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
                         BOT.send_message(chat_id, text, reply_markup=markup)
                     elif parse_text(message) == '/my_orders':
-                        order = db.session.query(Order).filter_by(uid=chat_id, order_state='Подтвержден').first()
+                        order = Order.query.filter_by(uid=chat_id, order_state='Подтверждена')
+                        order = order.order_by(Order.id.desc()).first()
                         if order:
-                            details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
-                            date = datetime.utcfromtimestamp(order.order_datetime).strftime('%d.%m.%Y %H:%M:%S')
+                            date = order.order_datetime
+                            current_tz = pytz.timezone('Asia/Yakutsk') # Некорректное время
+                            date = current_tz.localize(datetime.fromtimestamp(date)).strftime('%d.%m.%Y %H:%M:%S')
                             text = f'Ваш заказ № {order.id} от {date}\n'
+                            details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
                             for item in details:
                                 text += f'- {item.order_dish_name}\n'
                             text += f'Общая стоимость заказа - {order.order_total}\n'
@@ -943,9 +895,6 @@ def index():
                             total = 0
 
                             current_id = cart[0].id
-                            print('show_cart handler')
-                            print(cart)
-                            print(current_id)
                             cart_count = 0
                             for i in cart:
                                 if current_id == i.id:
@@ -1011,8 +960,6 @@ def index():
                     elif parse_text(message) is None:
                         try:
                             if re.search(r'^Напишите пожалуйста что хотите изменить в заказе № [0-9]+ .+$', bot_msg):
-                                print('Testing order change!')
-
                                 order_id = int(re.search(r'[0-9]+', message).group(0))
                                 order = db.session.query(Order).filter_by(id=order_id).first()
 
@@ -1040,9 +987,6 @@ def index():
                                 total = 0
 
                                 current_id = cart[0].id
-                                print('show_cart handler change order')
-                                print(cart)
-                                print(current_id)
                                 cart_count = 0
                                 for i in cart:
                                     if current_id == i.id:
@@ -1091,6 +1035,10 @@ def index():
                                 return 'Order change'
                             elif bot_msg == 'Укажите только адрес доставки без номера телефона. Можете написать так ' \
                                             'же ваши пожелания.':
+                                usr_msg = History.query.filter_by(chat_id=chat_id).order_by(History.id.desc()).first()
+                                cur_usr = db.session.query(User).filter_by(uid=chat_id).first()
+                                cur_usr.address = usr_msg.message_text
+                                db.session.commit()
                                 text = 'Укажите номер телефона'
                                 BOT.send_message(chat_id=chat_id, text=text)
                                 write_history(message_id, chat_id, text, is_bot=True)
@@ -1098,12 +1046,11 @@ def index():
                                 bot_msg = db.session.query(History).filter_by(message_id=message_id - 2,
                                                                               is_bot=False).first().message_text
                                 cur_usr = db.session.query(User).filter_by(uid=chat_id).first()
-                                cur_usr.address = bot_msg
                                 cur_usr.phone = message
                                 db.session.commit()
                                 text = 'Вы указали:\n'
-                                text += f'Адрес доставки: {bot_msg}\n'
-                                text += f'Контактный номер: {message}'
+                                text += f'Адрес доставки: {cur_usr.address}\n'
+                                text += f'Контактный номер: {cur_usr.phone}'
                                 buttons = [
                                     [InlineKeyboardButton('Отправить', callback_data='order_confirm')],
                                     [InlineKeyboardButton('Изменить данные', callback_data='cart_confirm')]
@@ -1138,7 +1085,7 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = db.session.query(Admin).filter(Admin.username == form.username.data).first()
-        if user and user.check_password(form.password.data):
+        if user and user.verify_password(form.password.data):
             login_user(user, remember=form.remember.data)
             return redirect(url_for('admin'))
 
@@ -1160,13 +1107,30 @@ def logout():
 def admin():
     dishes = db.session.query(Dish).all()
     restaurants = db.session.query(Restaurant).all()
-    dish_form = DishForm()
-    if dish_form.validate_on_submit():
+    adm = db.session.query(Admin)
+    categories = db.session.query(Category).all()
+    dish_delete_form = DishDeleteForm()
+    restaurant_form = RestaurantForm()
+    restaurant_delete_form = RestaurantDeleteForm()
+    restaurant_edit_form = RestaurantEditForm()
+    admin_add_form = AdminAddForm()
+    if current_user.username != 'admin':
+        dish_form = DishForm(hide_rest=True)
+        category_form = CategoryForm(hide_rest_id=True)
+        category_delete_form = CategoryDeleteForm(hide_rest_id=True)
+    else:
+        dish_form = DishForm(hide_rest=False)
+        category_form = CategoryForm(hide_rest_id=False)
+        category_delete_form = CategoryDeleteForm(hide_rest_id=False)
+    if dish_form.validate_on_submit() and dish_form.dish_add_submit.data:
         name = dish_form.name.data
         cost = dish_form.cost.data
         composition = dish_form.composition.data
         id_rest = dish_form.id_rest.data
-        img_file = secure_filename(dish_form.img_file.data.filename)
+        if re.search('[а-яА-Я]', dish_form.img_file.data.filename):
+            img_file = secure_filename(translit(dish_form.img_file.data.filename, reversed=True))
+        else:
+            img_file = secure_filename(dish_form.img_file.data.filename)
         static_path = 'static/' + str(id_rest) + '/'
         if not isdir(static_path):
             mkdir(static_path)
@@ -1186,8 +1150,8 @@ def admin():
         db.session.commit()
         flash("Блюдо добавлено", "success")
         return redirect(url_for('admin'))
-    category_form = CategoryForm()
-    if category_form.validate_on_submit():
+
+    elif category_form.validate_on_submit() and category_form.category_add_submit.data:
         name = category_form.name.data
         restaurant_id = category_form.restaurant_id.data
 
@@ -1196,20 +1160,91 @@ def admin():
         db.session.commit()
         flash("Категория добавлена", "success")
         return redirect(url_for('admin'))
-    delete_form = DeleteForm()
-    if delete_form.validate_on_submit():
-        dish_id = delete_form.delete_id.data
+
+    elif dish_delete_form.validate_on_submit() and dish_delete_form.dish_delete_submit.data:
+        dish_id = dish_delete_form.delete_id.data
         db.session.query(Dish).filter_by(id=dish_id).delete()
         db.session.commit()
         flash("Блюдо успешно удалено", "success")
         return redirect(url_for('admin'))
+
+    elif restaurant_form.validate_on_submit() and restaurant_form.rest_add_submit.data:
+        name = restaurant_form.name.data
+        address = restaurant_form.address.data
+        contact = restaurant_form.contact.data
+        passwd = restaurant_form.contact.data
+        service_uid = restaurant_form.service_uid.data
+        restaurant = Restaurant(name=name, address=address, contact=contact, passwd=passwd, service_uid=service_uid)
+        db.session.add(restaurant)
+        db.session.commit()
+        flash("Ресторан добавлен", "success")
+        return redirect(url_for('admin'))
+
+    elif category_delete_form.validate_on_submit() and category_delete_form.category_delete_submit.data:
+        name = category_delete_form.name.data
+        restaurant_id = category_delete_form.restaurant_id.data
+        db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
+        db.session.commit()
+        flash("Категория успешно удалена", "success")
+        return redirect(url_for('admin'))
+
+    elif restaurant_delete_form.validate_on_submit() and restaurant_delete_form.rest_delete_submit.data:
+        name = restaurant_delete_form.name.data
+        db.session.query(Restaurant).filter_by(name=name).delete()
+        db.session.commit()
+        flash("Ресторан успешно удален", "success")
+        return redirect(url_for('admin'))
+
+    elif restaurant_edit_form.validate_on_submit() and restaurant_edit_form.rest_edit_submit.data:
+        rest_id = restaurant_edit_form.id.data
+        name = restaurant_edit_form.name.data
+        address = restaurant_edit_form.address.data
+        contact = restaurant_edit_form.contact.data
+        passwd = restaurant_edit_form.passwd.data
+        rest = Restaurant.query.filter_by(id=rest_id).first()
+        if name:
+            rest.name = name
+        if address:
+            rest.address = address
+        if contact:
+            rest.contact = contact
+        if passwd:
+            rest.passwd = passwd
+        db.session.commit()
+        return redirect(url_for('admin'))
+
+    elif admin_add_form.validate_on_submit() and admin_add_form.admin_add_button.data:
+        username = admin_add_form.username.data
+        passwd = admin_add_form.passwd.data
+        mail = admin_add_form.email.data
+        ownership = admin_add_form.ownership.data
+        usr = Admin(
+            username=username,
+            email=mail,
+            password=passwd,
+            ownership=ownership
+        )
+        db.session.add(usr)
+        db.session.commit()
+        return redirect(url_for('admin'))
+
     return render_template(
         'admin.html',
         dishes=dishes,
         restaurants=restaurants,
+        categories=categories,
         dish_form=dish_form,
         category_form=category_form,
-        delete_form=delete_form
+        dish_delete_form=dish_delete_form,
+        restaurant_form=restaurant_form,
+        category_delete_form=category_delete_form,
+        restaurant_delete_form=restaurant_delete_form,
+        restaurant_edit_form=restaurant_edit_form,
+        admin_add_form=admin_add_form,
+        stat1=stat1(),
+        stat2=stat2(),
+        stat6=stat6(),
+        stat7=stat7()
     )
 
 
@@ -1233,7 +1268,7 @@ def write_json(data, filename='answer.json'):
 
 
 def parse_text(text):
-    pattern = r'(^Рестораны$)|(^Корзина$)|(^Оформить заказ$)|(\/\w+)|(\w+_[0-9]+$)|(^Статистика$)|(^Тест$)|(^Test$)'
+    pattern = r'(^Рестораны$)|(^Корзина$)|(^Оформить заказ$)|(^\/\w+)|(\w+_[0-9]+$)|(^Статистика$)|(^Тест$)|(^Test$)'
     try:
         value = re.search(pattern, text).group()
     except AttributeError:
@@ -1283,3 +1318,67 @@ def write_history(msg_id, chat_id, text, is_bot):
     )
     db.session.add(msg)
     db.session.commit()
+
+
+def stat1():
+    months = {
+        1: 'январь',
+        2: 'февраль',
+        3: 'март',
+        4: 'апрель',
+        5: 'май',
+        6: 'июнь',
+        7: 'июль',
+        8: 'август',
+        9: 'сентябрь',
+        10: 'октябрь',
+        11: 'ноябрь',
+        12: 'декабрь'
+    }
+    current_month = datetime.now().month
+    current_month_total = 0
+    current_month_rests_total = {}
+    stat_data = db.session.query(Order).all()
+    for data in stat_data:
+        order_date = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
+        if order_date == current_month:
+            current_month_total += data.order_total
+            rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
+            try:
+                current_month_rests_total.update(
+                    {rest: current_month_rests_total[rest] + data.order_total}
+                )
+            except KeyError:
+                current_month_rests_total.update({rest: data.order_total})
+    text = f'Общая сумма за {months[current_month]}: {current_month_total}р.\n'
+    for rest in current_month_rests_total:
+        text += f'Общая сумма заказов в ресторане {rest} за {months[current_month]} - ' \
+                f'{current_month_rests_total[rest]}р.\n'
+    return text
+
+
+def stat2():
+    current_month = datetime.now().month
+    stat_data = db.session.query(Order).order_by(Order.order_rest_id).all()
+    rests_data, text = [], ''
+    for data in stat_data:
+        month = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
+        if month == current_month:
+            rest = db.session.query(Restaurant.name).filter_by(id=data.order_rest_id).first()[0]
+            day = str(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
+            rests_data.append([rest, day, data.order_total, month])
+    for i in range(len(rests_data)):
+        if i == 0 or (i != 0 and rests_data[i][0] != rests_data[i-1][0]):
+            text += f'{rests_data[i][0]}\n'
+            text += f'{rests_data[i][1]}.{rests_data[i][3]} - {rests_data[i][2]} р.\n'
+        elif i != 0 and rests_data[i][0] == rests_data[i-1][0]:
+            text += f'{rests_data[i][1]}.{rests_data[i][3]} - {rests_data[i][2]} р.\n'
+    return text
+
+
+def stat6():
+    return db.session.query(Order).filter_by(order_state="Отменен").count()
+
+
+def stat7():
+    return db.session.query(User.id).count()

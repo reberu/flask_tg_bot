@@ -1,34 +1,58 @@
 {% extends 'base.html' %}
-
+{% block script %}
+<script>
+    $(document).ready(function() {
+        for (let i = 1; i < {{ restaurants|length }} + 1; i++) {
+            $("#btnRestEdit" + i).click(function(){
+                $("#restEdit" + i).toggle();
+            });
+        }
+        for (let j = 1; j < 8; j++) {
+            $("#btnStat" + j).click(function(){
+                $(".stat" + j).toggle();
+            });
+        }
+    });
+</script>
+{% endblock %}
 {% block title %}
     Панель администрирования
 {% endblock %}
 
 {% block content %}
     {% set ns = namespace (rest_id = 0) %}
-    <h2>Личный кабинет</h2>
-
+<h2 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">Личный кабинет</h2>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class=flashes>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
         {% if current_user.ownership == 'all' %}
             <ul>Вы администратор всех ресторанов</ul>
             {% for restaurant in restaurants %}
                 <div class="accordion" id="accordionRests">
                     <div class="card">
-                        <div class="card-header" id="heading{{ restaurant.name }}">
+                        <div class="card-header" id="heading{{ restaurant.id }}">
                             <h5 class="mb-0">
-                                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapse{{ restaurant.name }}" aria-expanded="false" aria-controls="collapse{{ restaurant.name }}">
+                                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapse{{ restaurant.id }}" aria-expanded="false" aria-controls="collapse{{ restaurant.id }}">
                                     {{ restaurant.name }}
                                 </button>
                             </h5>
                         </div>
-                        <div id="collapse{{ restaurant.name }}" class="collapse" aria-labelledby="heading{{ restaurant.name }}" data-parent="#accordionRests">
+                        <div id="collapse{{ restaurant.id }}" class="collapse" aria-labelledby="heading{{ restaurant.id }}" data-parent="#accordionRests">
                             <div class="card-body">
                                 <div class="d-flex justify-content-start align-items-center">
                                     <div class="p-2 flex-fill bd-highlight">Название блюда</div>
                                     <div class="p-2 flex-fill bd-highlight">Стоимость</div>
-                                    <div class="p-2 flex-fill bd-highlight">Состав</div>
+                                    <div class="p-2 flex-fill bd-highlight">Описание</div>
                                     <div class="p-2 flex-fill bd-highlight">Категория</div>
                                     <div class="p-2 flex-fill bd-highlight">Изображение</div>
-                                </div>
+                                    <div class="p-2 flex-fill bd-highlight"></div>
+                                    </div>
                                 {% for dish in dishes %}
                                     {% if dish.id_rest == restaurant.id %}
                                         <div class="d-flex justify-content-start align-items-center">
@@ -37,10 +61,42 @@
                                             <div class="p-2 flex-fill bd-highlight">{{ dish.composition }}</div>
                                             <div class="p-2 flex-fill bd-highlight">{{ dish.category }}</div>
                                             <div class="p-2 flex-fill bd-highlight"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></div>
+                                            <div class="p-2 flex-fill bd-highlight">
+                                                <form method="post">
+                                                    {{ dish_delete_form.csrf_token }}
+                                                    {{ dish_delete_form.delete_id(value=dish.id) }}
+                                                    {{ dish_delete_form.dish_delete_submit(class="btn btn-danger") }}
+                                                </form>
+                                            </div>
                                         </div>
                                     {% endif %}
                                 {% endfor %}
-
+                                <button id="btnRestEdit{{ restaurant.id }}" type="button">Изменить данные ресторана</button>
+                                <form id="restEdit{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                    <table>
+                                        {{ restaurant_edit_form.csrf_token }}
+                                        {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;") }}
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.name.label }}</td>
+                                            <td>{{ restaurant_edit_form.name(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.address.label }}</td>
+                                            <td>{{ restaurant_edit_form.address(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.contact.label }}</td>
+                                            <td>{{ restaurant_edit_form.contact(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.passwd.label }}</td>
+                                            <td>{{ restaurant_edit_form.passwd(size="50") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(class="btn btn-warning") }}</td>
+                                        </tr>
+                                    </table>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -52,7 +108,7 @@
                 <tr>
                     <th>Название блюда</th>
                     <th>Стоимость</th>
-                    <th>Состав</th>
+                    <th>Описание</th>
                     <th>Категория</th>
                     <th>Изображение</th>
                     <th></th>
@@ -71,9 +127,9 @@
                                 <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
                                 <td>
                                     <form method="post">
-                                        {{ delete_form.csrf_token }}
-                                        {{ delete_form.delete_id(value=dish.id) }}
-                                        {{ delete_form.delete(class="btn btn-danger") }}
+                                        {{ dish_delete_form.csrf_token }}
+                                        {{ dish_delete_form.delete_id(value=dish.id) }}
+                                        {{ dish_delete_form.dish_delete_submit(class="btn btn-danger") }}
                                     </form>
                                 </td>
                             </tr>
@@ -119,17 +175,17 @@
                                 <td>{{ dish_form.category }}</td>
                             </tr>
                             <tr>
-                                <td>{{ dish_form.id_rest.label }}</td>
-                                <td>
+                                {% if current_user.ownership != 'all' %}
                                     {% if ns.rest_id != 0 %}
-                                        {{ dish_form.id_rest(value=ns.rest_id) }}
-                                    {% else %}
-                                        {{ dish_form.id_rest }}
-                                    {% endif %}
-                                </td>
+                                            {{ dish_form.id_rest(value=ns.rest_id) }}
+                                        {% endif %}
+                                {% else %}
+                                    <td>{{ dish_form.id_rest.label }}</td>
+                                    <td>{{ dish_form.id_rest }}</td>
+                                {% endif %}
                             </tr>
                             <tr>
-                                <td>{{ dish_form.submit }}</td>
+                                <td>{{ dish_form.dish_add_submit }}</td>
                             </tr>
                         </table>
                     </form>
@@ -148,24 +204,69 @@
                 <div class="card-body">
                     <form action="" method="post">
                         {{ category_form.csrf_token() }}
+
                         <table>
+                            {% if ns.rest_id != 0 %}
                             <tr>
                                 <td>{{ category_form.name.label }}</td>
                                 <td>{{ category_form.name }}</td>
                             </tr>
                             <tr>
+                                <td>
+                                    {{ category_form.restaurant_id(value=ns.rest_id) }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td>{{ category_form.restaurant_id.label }}</td>
+                                <td>{{ category_form.restaurant_id }}</td>
+                            </tr>
+                            <tr>
+                                <td>{{ category_form.name.label }}</td>
+                                <td>{{ category_form.name }}</td>
+                            </tr>
+                            {% endif %}
+
+                            <tr>
+                                <td>{{ category_form.category_add_submit }}</td>
+                            </tr>
+                        </table>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header" id="headingFour">
+                <h2 class="mb-0">
+                    <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+                        Удалить категорию
+                    </button>
+                </h2>
+            </div>
+            <div id="collapseFour" class="collapse" aria-labelledby="headingFour" data-parent="#accordionExample">
+                <div class="card-body">
+                    <form action="" method="post">
+                        {{ category_delete_form.csrf_token() }}
+                        <table>
+                            <tr>
+                                <td>{{ category_delete_form.name.label }}</td>
+                                <td>
+                                    {{ category_delete_form.name }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <tr>
                                 {% if ns.rest_id != 0 %}
                                     <td>
-                                        {{ category_form.restaurant_id(value=ns.rest_id) }}
+                                        {{ category_delete_form.restaurant_id(value=ns.rest_id) }}
                                     </td>
                                 {% else %}
-                                    <td>
-                                        {{ category_form.restaurant_id }}
-                                    </td>
+                                    <td>{{ category_delete_form.restaurant_id.label }}</td>
+                                    <td>{{ category_delete_form.restaurant_id }}</td>
                                 {% endif %}
                             </tr>
                             <tr>
-                                <td>{{ category_form.submit }}</td>
+                                <td>{{ category_delete_form.category_delete_submit }}</td>
                             </tr>
                         </table>
                     </form>
@@ -173,5 +274,145 @@
             </div>
         </div>
     </div>
+    {% if current_user.ownership == 'all' %}
+        <div class="accordion" id="accordionRest">
+            <div class="card">
+                <div class="card-header" id="headingRest">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseRest" aria-expanded="false" aria-controls="collapseRest">
+                            Добавить ресторан
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseRest" class="collapse" aria-labelledby="headingRest" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data">
+                            {{ restaurant_form.csrf_token() }}
+                            <table>
+                                <tr>
+                                    <td>{{ restaurant_form.name.label }}</td>
+                                    <td>{{ restaurant_form.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_form.address.label }}</td>
+                                    <td>{{ restaurant_form.address }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_form.contact.label }}</td>
+                                    <td>{{ restaurant_form.contact }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_form.passwd.label }}</td>
+                                    <td>{{ restaurant_form.passwd }}</td>
+                                </tr>
+                                <tr>
+                                    {{ restaurant_form.service_uid(value=None) }}
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_form.rest_add_submit }}</td>
+                                </tr>
+                            </table>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header" id="headingRestDelete">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseRestDelete" aria-expanded="false" aria-controls="collapseRestDelete">
+                            Удалить ресторан
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseRestDelete" class="collapse" aria-labelledby="headingRestDelete" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data">
+                            {{ restaurant_delete_form.csrf_token() }}
+                            <table>
+                                <tr>
+                                    <td>{{ restaurant_delete_form.name.label }}</td>
+                                    <td>{{ restaurant_delete_form.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_delete_form.rest_delete_submit }}</td>
+                                </tr>
+                            </table>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header" id="headingStat">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseStat" aria-expanded="false" aria-controls="collapseStat">
+                            Статистика
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseStat" class="collapse" aria-labelledby="headingStat" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <div>Количество заказов в сумме отдельно по ресторанам и в общем полная сумма по всем ресторанам за месяц.</div>
+                        <button id="btnStat1">Показать</button>
+                        <div class="stat1" style="display:none;white-space:pre;">{{ stat1 }}</div>
+                        <div style="margin-top:15px;">Количество заказов по ресторанам по дням, неделям, в месяце.</div>
+                        <button id="btnStat2">Показать</button>
+                        <div class="stat2" style="display:none;white-space:pre;">{{ stat2 }}</div>
+                        <div style="margin-top:15px;">Количество заказов в общем по дням, неделям, в месяце.</div>
+                        <button id="btnStat3">Показать</button>
+                        <div class="stat3" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Статистика заказов блюд, какие блюда часто заказывают, какие меньше - суши, пиццу, горячее.</div>
+                        <button id="btnStat4">Показать</button>
+                        <div class="stat4" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Количество изменений в заказе.</div>
+                        <button id="btnStat5">Показать</button>
+                        <div class="stat5" style="display:none;">В разработке</div>
+                        <div style="margin-top:15px;">Количество отмен заказов.</div>
+                        <button id="btnStat6">Показать</button>
+                        <div class="stat6" style="display:none;">Количество отмененных заказов - {{ stat6 }}</div>
+                        <div style="margin-top:15px;">Количество уникальных посетителей.</div>
+                        <button id="btnStat7">Показать</button>
+                        <div class="stat7" style="display:none;">Количество уникальных пользователей - {{ stat7 }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header" id="adminAdd">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminAdd" aria-expanded="false" aria-controls="collapseAdminAdd">
+                            Добавить пользователя
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapseAdminAdd" class="collapse" aria-labelledby="adminAdd" data-parent="#accordionRest">
+                    <div class="card-body">
+                        <form method="POST" enctype="multipart/form-data">
+                            <table>
+                                {{ admin_add_form.csrf_token }}
+                                <tr>
+                                    <td>{{ admin_add_form.username.label }}</td>
+                                    <td>{{ admin_add_form.username(size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.passwd.label }}</td>
+                                    <td>{{ admin_add_form.passwd(type="password", size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.email.label }}</td>
+                                    <td>{{ admin_add_form.email(type="email", size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.ownership.label }}</td>
+                                    <td>{{ admin_add_form.ownership(size="50") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ admin_add_form.admin_add_button(class="btn btn-success") }}</td>
+                                </tr>
+                            </table>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
 {% endblock %}
