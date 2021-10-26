@@ -113,3 +113,14 @@ class Admin(db.Model, UserMixin):
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+
+class RestaurantDeliveryTerms(db.Model):
+    __tablename__ = 'delivery_terms'
+    id = db.Column(db.Integer(), primary_key=True)
+    rest_id = db.Column(db.Integer(), nullable=False)
+    terms = db.Column(db.Text())
+    rest_inn = db.Column(db.Integer())
+    rest_ogrn = db.Column(db.Integer())
+    rest_fullname = db.Column(db.String())
+    rest_address = db.Column(db.String())

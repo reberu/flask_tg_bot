@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
 from wtforms import StringField, SubmitField, BooleanField, PasswordField, IntegerField, HiddenField, widgets, \
-    SelectField
+    SelectField, TextField
 from wtforms.validators import DataRequired
 from app import db
 from models import *
@@ -91,3 +91,13 @@ class AdminAddForm(FlaskForm):
     email = StringField("Почта", validators=[DataRequired()])
     ownership = StringField("Наименование ресторана")
     admin_add_button = SubmitField("Создать")
+
+
+class RestaurantDeliveryTermsForm(FlaskForm):
+    rest_id = HiddenField("Hidden restaurant id field", validators=[DataRequired()])
+    terms = TextField("Условия доставки")
+    rest_inn = IntegerField("ИНН")
+    rest_ogrn = IntegerField("ОГРН")
+    rest_fullname = StringField("Название организации")
+    rest_address = StringField("Адрес")
+    delivery_terms_submit = SubmitField("Отправить")

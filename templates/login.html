@@ -1,14 +1,18 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    Login page
+    Вход в систему
 {% endblock %}
 
 {% block content %}
     <h2>Пожалуйста введите ваши учетные данные</h2>
-    {% for category, message in  get_flashed_messages(with_categories=true) %}
-	    <spam class="{{ category }}">{{ message }}</spam>
-    {% endfor %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+	            <div class="{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
     <br/>
     <form action="" method="post">
 	    {{ form.csrf_token }}

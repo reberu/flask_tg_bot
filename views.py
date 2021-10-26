@@ -9,7 +9,7 @@ from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeybo
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
-    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm
+    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm, RestaurantDeliveryTermsForm
 from settings import BOT_TOKEN, BASE_URL
 
 import re
@@ -21,7 +21,7 @@ from flask_login import login_required, login_user, current_user, logout_user
 
 from app import app, db, sched, login_manager
 
-from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin
+from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin, RestaurantDeliveryTerms
 
 from werkzeug.utils import secure_filename
 
@@ -75,6 +75,9 @@ def index():
                         buttons.append(
                             [InlineKeyboardButton(category.name,
                                                   callback_data=f'restaurant_{rest_id}_cat{category.id}')])
+
+                    cb_data = f'restaurant_{rest_id}_delivery_terms'
+                    buttons.append([InlineKeyboardButton('Условия доставки', callback_data=cb_data)])
                     buttons.append([InlineKeyboardButton('Назад', callback_data='back_to_rest_kb')])
                     if 'menu' in data:
                         BOT.sendMessage(
@@ -246,6 +249,22 @@ def index():
                                 reply_markup=InlineKeyboardMarkup(buttons),
                                 parse_mode=ParseMode.HTML
                             )
+                elif re.search(r'^restaurant_[0-9]+_delivery_terms$', data):
+                    delivery_terms = RestaurantDeliveryTerms.query.filter_by(rest_id=int(data.split('_')[1])).first()
+                    text = ''
+                    if delivery_terms:
+                        text += delivery_terms.terms + '\n'
+                        if delivery_terms.rest_inn:
+                            text += f'ИНН: {delivery_terms.rest_inn}\n'
+                        if delivery_terms.rest_ogrn:
+                            text += f'ОГРН: {delivery_terms.rest_ogrn}\n'
+                        if delivery_terms.rest_fullname:
+                            text += f'Название организации: {delivery_terms.rest_fullname}\n'
+                        if delivery_terms.rest_address:
+                            text += f'Адрес: {delivery_terms.rest_address}'
+                    else:
+                        text += 'Ресторан не предоставил сведений'
+                    BOT.sendMessage(text=text, chat_id=chat_id)
                 elif re.search(r'(^cart$)|'
                                r'(^cart_id_[0-9]+$)|'
                                r'(^cart_id_[0-9]+_clear$)|'
@@ -865,7 +884,7 @@ def index():
                         order = order.order_by(Order.id.desc()).first()
                         if order:
                             date = order.order_datetime
-                            current_tz = pytz.timezone('Asia/Yakutsk') # Некорректное время
+                            current_tz = pytz.timezone('Asia/Yakutsk')
                             date = current_tz.localize(datetime.fromtimestamp(date)).strftime('%d.%m.%Y %H:%M:%S')
                             text = f'Ваш заказ № {order.id} от {date}\n'
                             details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
@@ -1107,13 +1126,13 @@ def logout():
 def admin():
     dishes = db.session.query(Dish).all()
     restaurants = db.session.query(Restaurant).all()
-    adm = db.session.query(Admin)
     categories = db.session.query(Category).all()
     dish_delete_form = DishDeleteForm()
     restaurant_form = RestaurantForm()
     restaurant_delete_form = RestaurantDeleteForm()
     restaurant_edit_form = RestaurantEditForm()
     admin_add_form = AdminAddForm()
+    rest_delivery_terms_form = RestaurantDeliveryTermsForm()
     if current_user.username != 'admin':
         dish_form = DishForm(hide_rest=True)
         category_form = CategoryForm(hide_rest_id=True)
@@ -1228,6 +1247,25 @@ def admin():
         db.session.commit()
         return redirect(url_for('admin'))
 
+    elif rest_delivery_terms_form.validate_on_submit() and rest_delivery_terms_form.delivery_terms_submit.data:
+        rest_id = rest_delivery_terms_form.rest_id.data
+        terms = rest_delivery_terms_form.terms.data
+        rest_inn = rest_delivery_terms_form.rest_inn.data
+        rest_ogrn = rest_delivery_terms_form.rest_ogrn.data
+        rest_fullname = rest_delivery_terms_form.rest_fullname.data
+        rest_address = rest_delivery_terms_form.rest_address.data
+        delivery_terms = RestaurantDeliveryTerms(
+            rest_id=rest_id,
+            terms=terms,
+            rest_inn=rest_inn,
+            rest_ogrn=rest_ogrn,
+            rest_fullname=rest_fullname,
+            rest_address=rest_address
+        )
+        db.session.add(delivery_terms)
+        db.session.commit()
+        return redirect(url_for('admin'))
+
     return render_template(
         'admin.html',
         dishes=dishes,
@@ -1241,6 +1279,7 @@ def admin():
         restaurant_delete_form=restaurant_delete_form,
         restaurant_edit_form=restaurant_edit_form,
         admin_add_form=admin_add_form,
+        rest_delivery_terms_form=rest_delivery_terms_form,
         stat1=stat1(),
         stat2=stat2(),
         stat6=stat6(),

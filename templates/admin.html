@@ -116,6 +116,7 @@
                 {% for restaurant in restaurants %}
 
                     {% if current_user.ownership == restaurant.name %}
+
                         {% set ns.rest_id = restaurant.id %}
                         {% for dish in dishes|sort(attribute='category') %}
                             {% if dish.id_rest == ns.rest_id %}
@@ -273,6 +274,51 @@
                 </div>
             </div>
         </div>
+        {% if current_user.ownership != 'all' %}
+            <div class="card">
+                <div class="card-header" id="headingFive">
+                    <h2 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseFive" aria-expanded="false" aria-controls="collapseFive">
+                            Условия доставки
+                        </button>
+                    </h2>
+                </div>
+                <div id="collapseFive" class="collapse" aria-labelledby="headingFive" data-parent="#accordionExample">
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data">
+                            {{ rest_delivery_terms_form.csrf_token() }}
+                            <table>
+
+                                {{ rest_delivery_terms_form.rest_id(value=ns.rest_id) }}
+                                <tr>
+                                    <td>{{ rest_delivery_terms_form.terms.label }}</td>
+                                    <td>{{ rest_delivery_terms_form.terms }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_form.rest_inn.label }}</td>
+                                    <td>{{ rest_delivery_terms_form.rest_inn }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_form.rest_ogrn.label }}</td>
+                                    <td>{{ rest_delivery_terms_form.rest_ogrn }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_form.rest_fullname.label }}</td>
+                                    <td>{{ rest_delivery_terms_form.rest_fullname }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_form.rest_address.label }}</td>
+                                    <td>{{ rest_delivery_terms_form.rest_address }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_form.delivery_terms_submit }}</td>
+                                </tr>
+                            </table>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
     </div>
     {% if current_user.ownership == 'all' %}
         <div class="accordion" id="accordionRest">
