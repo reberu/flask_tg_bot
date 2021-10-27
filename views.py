@@ -9,7 +9,7 @@ from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeybo
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
-    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm, RestaurantDeliveryTermsForm
+    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm, RestaurantDeliveryTermsForm, RestaurantDeliveryTermsEditForm
 from settings import BOT_TOKEN, BASE_URL
 
 import re
@@ -1132,7 +1132,9 @@ def admin():
     restaurant_delete_form = RestaurantDeleteForm()
     restaurant_edit_form = RestaurantEditForm()
     admin_add_form = AdminAddForm()
+    delivery_terms = RestaurantDeliveryTerms.query.all()
     rest_delivery_terms_form = RestaurantDeliveryTermsForm()
+    rest_delivery_terms_edit_form = RestaurantDeliveryTermsEditForm()
     if current_user.username != 'admin':
         dish_form = DishForm(hide_rest=True)
         category_form = CategoryForm(hide_rest_id=True)
@@ -1265,6 +1267,27 @@ def admin():
         db.session.add(delivery_terms)
         db.session.commit()
         return redirect(url_for('admin'))
+    
+    elif rest_delivery_terms_edit_form.validate_on_submit() and rest_delivery_terms_edit_form.terms_edit_submit.data:
+        rest_id = rest_delivery_terms_edit_form.rest_id.data
+        terms_data = rest_delivery_terms_edit_form.terms.data
+        rest_inn = rest_delivery_terms_edit_form.rest_inn.data
+        rest_ogrn = rest_delivery_terms_edit_form.rest_ogrn.data
+        rest_fullname = rest_delivery_terms_edit_form.rest_fullname.data
+        rest_address = rest_delivery_terms_edit_form.rest_address.data
+        terms = RestaurantDeliveryTerms.query.filter_by(id=rest_id).first()
+        if terms_data:
+            terms.terms = terms_data
+        if rest_inn:
+            terms.rest_inn = rest_inn
+        if rest_ogrn:
+            terms.rest_ogrn = rest_ogrn
+        if rest_fullname:
+            terms.rest_fullname = rest_fullname
+        if rest_address:
+            terms.rest_address = rest_address
+        db.session.commit()
+        return redirect(url_for('admin'))
 
     return render_template(
         'admin.html',
@@ -1280,6 +1303,8 @@ def admin():
         restaurant_edit_form=restaurant_edit_form,
         admin_add_form=admin_add_form,
         rest_delivery_terms_form=rest_delivery_terms_form,
+        rest_delivery_terms_edit_form=rest_delivery_terms_edit_form,
+        delivery_terms=delivery_terms,
         stat1=stat1(),
         stat2=stat2(),
         stat6=stat6(),

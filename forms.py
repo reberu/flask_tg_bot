@@ -101,3 +101,13 @@ class RestaurantDeliveryTermsForm(FlaskForm):
     rest_fullname = StringField("Название организации")
     rest_address = StringField("Адрес")
     delivery_terms_submit = SubmitField("Отправить")
+
+
+class RestaurantDeliveryTermsEditForm(FlaskForm):
+    rest_id = HiddenField("Hidden restaurant id field", validators=[DataRequired()])
+    terms = TextField("Условия доставки")
+    rest_inn = IntegerField("ИНН")
+    rest_ogrn = IntegerField("ОГРН")
+    rest_fullname = StringField("Название организации")
+    rest_address = StringField("Адрес")
+    terms_edit_submit = SubmitField("Изменить")

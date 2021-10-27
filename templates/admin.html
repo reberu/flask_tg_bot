@@ -285,6 +285,40 @@
                 </div>
                 <div id="collapseFive" class="collapse" aria-labelledby="headingFive" data-parent="#accordionExample">
                     <div class="card-body">
+                        <p>Можете внести изменения в любое поле</p>
+                {% for term in delivery_terms %}
+                    {% if term.rest_id == ns.rest_id %}
+                        <!--Here we need to show edit form-->
+                        <form method="post" enctype="multipart/form-data">
+                            {{ rest_delivery_terms_edit_form.csrf_token() }}
+                            <table>
+                                {{ rest_delivery_terms_edit_form.rest_id(value=ns.rest_id) }}
+                                <tr>
+                                    <td>{{ rest_delivery_terms_edit_form.terms.label }}</td>
+                                    <td>{{ rest_delivery_terms_edit_form.terms }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_inn.label }}</td>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_inn }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_ogrn.label }}</td>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_ogrn }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_fullname.label }}</td>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_fullname }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_address.label }}</td>
+                                    <td>{{ rest_delivery_terms_edit_form.rest_address }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ rest_delivery_terms_edit_form.terms_edit_submit }}</td>
+                                </tr>
+                            </table>
+                        </form>
+                    {% else %}
                         <form method="post" enctype="multipart/form-data">
                             {{ rest_delivery_terms_form.csrf_token() }}
                             <table>
@@ -315,7 +349,9 @@
                                 </tr>
                             </table>
                         </form>
+                    {% endif %}
                     </div>
+                {% endfor %}
                 </div>
             </div>
         {% endif %}
