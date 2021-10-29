@@ -5,13 +5,9 @@ from flask_login import LoginManager
 from settings import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from dishes.blueprint import dishes
-
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
-app.register_blueprint(dishes, url_prefix='/dishes')
 
 manager = Manager(app)
 db = SQLAlchemy(app)

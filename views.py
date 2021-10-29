@@ -9,7 +9,7 @@ from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeybo
 from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
-    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm
+    RestaurantDeleteForm, RestaurantEditForm, AdminAddForm, RestaurantDeliveryTermsForm, RestaurantDeliveryTermsEditForm
 from settings import BOT_TOKEN, BASE_URL
 
 import re
@@ -21,7 +21,7 @@ from flask_login import login_required, login_user, current_user, logout_user
 
 from app import app, db, sched, login_manager
 
-from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin
+from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin, RestaurantDeliveryTerms
 
 from werkzeug.utils import secure_filename
 
@@ -75,6 +75,10 @@ def index():
                         buttons.append(
                             [InlineKeyboardButton(category.name,
                                                   callback_data=f'restaurant_{rest_id}_cat{category.id}')])
+                    cb_data = f'restaurant_{rest_id}_delivery_time'
+                    buttons.append([InlineKeyboardButton('Узнать время доставки', callback_data=cb_data)])
+                    cb_data = f'restaurant_{rest_id}_delivery_terms'
+                    buttons.append([InlineKeyboardButton('Условия доставки', callback_data=cb_data)])
                     buttons.append([InlineKeyboardButton('Назад', callback_data='back_to_rest_kb')])
                     if 'menu' in data:
                         BOT.sendMessage(
@@ -246,6 +250,28 @@ def index():
                                 reply_markup=InlineKeyboardMarkup(buttons),
                                 parse_mode=ParseMode.HTML
                             )
+                elif re.search(r'^restaurant_[0-9]+_delivery_terms$', data):
+                    delivery_terms = RestaurantDeliveryTerms.query.filter_by(rest_id=int(data.split('_')[1])).first()
+                    text = ''
+                    if delivery_terms:
+                        text += delivery_terms.terms + '\n'
+                        if delivery_terms.rest_inn:
+                            text += f'ИНН: {delivery_terms.rest_inn}\n'
+                        if delivery_terms.rest_ogrn:
+                            text += f'ОГРН: {delivery_terms.rest_ogrn}\n'
+                        if delivery_terms.rest_fullname:
+                            text += f'Название организации: {delivery_terms.rest_fullname}\n'
+                        if delivery_terms.rest_address:
+                            text += f'Адрес: {delivery_terms.rest_address}'
+                    else:
+                        text += 'Ресторан не предоставил сведений'
+                    BOT.sendMessage(text=text, chat_id=chat_id)
+                elif re.search(r'^restaurant_[0-9]+_delivery_time$', data):
+                    rest_id = int(data.split('_')[1])
+                    rest = Restaurant.query.filter_by(id=rest_id).first()
+                    text = f'Укажите адрес доставки для ресторана {rest.name}'
+                    BOT.send_message(text=text, chat_id=chat_id)
+                    write_history(message_id, chat_id, text, is_bot=True)
                 elif re.search(r'(^cart$)|'
                                r'(^cart_id_[0-9]+$)|'
                                r'(^cart_id_[0-9]+_clear$)|'
@@ -809,6 +835,29 @@ def index():
                     BOT.send_message(chat_id=service_uid, text=text)
                     order.order_state = 'Отменен'
                     db.session.commit()
+                elif re.search(r'^rest_[0-9]+_uid_[0-9]+_delivery_time_(30|60|120|180|240|no)$', data):
+                    rest_id, uid = int(data.split('_')[1]), int(data.split('_')[3])
+                    service_uid = Restaurant.query.filter_by(id=rest_id).first().service_uid
+                    try:
+                        time = int(data.split('_')[6])
+                        text = 'Сообщение от ресторана: Доставка будет осуществлена за '
+                        time_text = ''
+                        if time == 30:
+                            time_text += f'{time} минут'
+                        elif time == 60:
+                            time_text += '1 час'
+                        elif time == 120 or time == 180 or time == 240:
+                            time_text += f'{time // 60} часа'
+                        text += time_text
+                        BOT.sendMessage(chat_id=uid, text=text)
+                        text = f'Мы оповестили клиента, что можем доставить за {time_text} на указанный адрес'
+                        BOT.sendMessage(chat_id=service_uid, text=text)
+                    except ValueError:
+                        text = 'К сожалению, ресторан не сможет осуществить доставку на указанный адрес'
+                        BOT.sendMessage(chat_id=uid, text=text)
+                        text = 'Мы оповестили клиента о невозможности осуществления доставки на указанный адрес'
+                        BOT.sendMessage(chat_id=service_uid, text=text)
+
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
                     stat_data = db.session.query(Order).all()
@@ -865,7 +914,7 @@ def index():
                         order = order.order_by(Order.id.desc()).first()
                         if order:
                             date = order.order_datetime
-                            current_tz = pytz.timezone('Asia/Yakutsk') # Некорректное время
+                            current_tz = pytz.timezone('Asia/Yakutsk')
                             date = current_tz.localize(datetime.fromtimestamp(date)).strftime('%d.%m.%Y %H:%M:%S')
                             text = f'Ваш заказ № {order.id} от {date}\n'
                             details = db.session.query(OrderDetail).filter_by(order_id=order.id).all()
@@ -1058,6 +1107,32 @@ def index():
                                 BOT.send_message(chat_id=chat_id,
                                                  text=text,
                                                  reply_markup=InlineKeyboardMarkup(buttons))
+                            elif 'Укажите адрес доставки для ресторана' in bot_msg:
+                                rest_name = bot_msg.split(' ')[5]
+                                bot_msg = db.session.query(History).filter_by(message_id=message_id - 2,
+                                                                              is_bot=False).first().message_text
+                                address = message
+                                rest = Restaurant.query.filter_by(name=rest_name).first()
+                                text = 'Запрос отправлен в ресторан, ожидайте'
+                                BOT.sendMessage(chat_id=chat_id, text=text)
+                                text = f'Клиент хочет узнать время доставки, укажите примерное время.\n'\
+                                       f'Адрес доставки: {address}'
+                                cb_text = 'Можем доставить за'
+                                cb_text_no = 'Не можем доставить на этот адрес'
+                                cb_data = f'rest_{rest.id}_uid_{chat_id}_delivery_time'
+                                buttons = [
+                                    [InlineKeyboardButton(f'{cb_text} 30 минут', callback_data=f'{cb_data}_30')],
+                                    [InlineKeyboardButton(f'{cb_text} 1 час', callback_data=f'{cb_data}_60')],
+                                    [InlineKeyboardButton(f'{cb_text} 2 часа', callback_data=f'{cb_data}_120')],
+                                    [InlineKeyboardButton(f'{cb_text} 3 часа', callback_data=f'{cb_data}_180')],
+                                    [InlineKeyboardButton(f'{cb_text} 4 часа', callback_data=f'{cb_data}_240')],
+                                    [InlineKeyboardButton(cb_text_no, callback_data=f'{cb_data}_no')]
+                                ]
+                                BOT.sendMessage(
+                                    chat_id=rest.service_uid,
+                                    text=text,
+                                    reply_markup=InlineKeyboardMarkup(buttons)
+                                )
                         except TypeError:
                             print('TypeError')
                             print("We can't handle this message", message)
@@ -1107,13 +1182,15 @@ def logout():
 def admin():
     dishes = db.session.query(Dish).all()
     restaurants = db.session.query(Restaurant).all()
-    adm = db.session.query(Admin)
     categories = db.session.query(Category).all()
     dish_delete_form = DishDeleteForm()
     restaurant_form = RestaurantForm()
     restaurant_delete_form = RestaurantDeleteForm()
     restaurant_edit_form = RestaurantEditForm()
     admin_add_form = AdminAddForm()
+    delivery_terms = RestaurantDeliveryTerms.query.all()
+    rest_delivery_terms_form = RestaurantDeliveryTermsForm()
+    rest_delivery_terms_edit_form = RestaurantDeliveryTermsEditForm()
     if current_user.username != 'admin':
         dish_form = DishForm(hide_rest=True)
         category_form = CategoryForm(hide_rest_id=True)
@@ -1228,6 +1305,46 @@ def admin():
         db.session.commit()
         return redirect(url_for('admin'))
 
+    elif rest_delivery_terms_form.validate_on_submit() and rest_delivery_terms_form.delivery_terms_submit.data:
+        rest_id = rest_delivery_terms_form.rest_id.data
+        terms = rest_delivery_terms_form.terms.data
+        rest_inn = rest_delivery_terms_form.rest_inn.data
+        rest_ogrn = rest_delivery_terms_form.rest_ogrn.data
+        rest_fullname = rest_delivery_terms_form.rest_fullname.data
+        rest_address = rest_delivery_terms_form.rest_address.data
+        delivery_terms = RestaurantDeliveryTerms(
+            rest_id=rest_id,
+            terms=terms,
+            rest_inn=rest_inn,
+            rest_ogrn=rest_ogrn,
+            rest_fullname=rest_fullname,
+            rest_address=rest_address
+        )
+        db.session.add(delivery_terms)
+        db.session.commit()
+        return redirect(url_for('admin'))
+    
+    elif rest_delivery_terms_edit_form.validate_on_submit() and rest_delivery_terms_edit_form.terms_edit_submit.data:
+        rest_id = rest_delivery_terms_edit_form.rest_id.data
+        terms_data = rest_delivery_terms_edit_form.terms.data
+        rest_inn = rest_delivery_terms_edit_form.rest_inn.data
+        rest_ogrn = rest_delivery_terms_edit_form.rest_ogrn.data
+        rest_fullname = rest_delivery_terms_edit_form.rest_fullname.data
+        rest_address = rest_delivery_terms_edit_form.rest_address.data
+        terms = RestaurantDeliveryTerms.query.filter_by(id=rest_id).first()
+        if terms_data:
+            terms.terms = terms_data
+        if rest_inn:
+            terms.rest_inn = rest_inn
+        if rest_ogrn:
+            terms.rest_ogrn = rest_ogrn
+        if rest_fullname:
+            terms.rest_fullname = rest_fullname
+        if rest_address:
+            terms.rest_address = rest_address
+        db.session.commit()
+        return redirect(url_for('admin'))
+
     return render_template(
         'admin.html',
         dishes=dishes,
@@ -1241,6 +1358,9 @@ def admin():
         restaurant_delete_form=restaurant_delete_form,
         restaurant_edit_form=restaurant_edit_form,
         admin_add_form=admin_add_form,
+        rest_delivery_terms_form=rest_delivery_terms_form,
+        rest_delivery_terms_edit_form=rest_delivery_terms_edit_form,
+        delivery_terms=delivery_terms,
         stat1=stat1(),
         stat2=stat2(),
         stat6=stat6(),
