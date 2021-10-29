@@ -75,7 +75,8 @@ def index():
                         buttons.append(
                             [InlineKeyboardButton(category.name,
                                                   callback_data=f'restaurant_{rest_id}_cat{category.id}')])
-
+                    cb_data = f'restaurant_{rest_id}_delivery_time'
+                    buttons.append([InlineKeyboardButton('Узнать время доставки', callback_data=cb_data)])
                     cb_data = f'restaurant_{rest_id}_delivery_terms'
                     buttons.append([InlineKeyboardButton('Условия доставки', callback_data=cb_data)])
                     buttons.append([InlineKeyboardButton('Назад', callback_data='back_to_rest_kb')])
@@ -265,6 +266,12 @@ def index():
                     else:
                         text += 'Ресторан не предоставил сведений'
                     BOT.sendMessage(text=text, chat_id=chat_id)
+                elif re.search(r'^restaurant_[0-9]+_delivery_time$', data):
+                    rest_id = int(data.split('_')[1])
+                    rest = Restaurant.query.filter_by(id=rest_id).first()
+                    text = f'Укажите адрес доставки для ресторана {rest.name}'
+                    BOT.send_message(text=text, chat_id=chat_id)
+                    write_history(message_id, chat_id, text, is_bot=True)
                 elif re.search(r'(^cart$)|'
                                r'(^cart_id_[0-9]+$)|'
                                r'(^cart_id_[0-9]+_clear$)|'
@@ -828,6 +835,29 @@ def index():
                     BOT.send_message(chat_id=service_uid, text=text)
                     order.order_state = 'Отменен'
                     db.session.commit()
+                elif re.search(r'^rest_[0-9]+_uid_[0-9]+_delivery_time_(30|60|120|180|240|no)$', data):
+                    rest_id, uid = int(data.split('_')[1]), int(data.split('_')[3])
+                    service_uid = Restaurant.query.filter_by(id=rest_id).first().service_uid
+                    try:
+                        time = int(data.split('_')[6])
+                        text = 'Сообщение от ресторана: Доставка будет осуществлена за '
+                        time_text = ''
+                        if time == 30:
+                            time_text += f'{time} минут'
+                        elif time == 60:
+                            time_text += '1 час'
+                        elif time == 120 or time == 180 or time == 240:
+                            time_text += f'{time // 60} часа'
+                        text += time_text
+                        BOT.sendMessage(chat_id=uid, text=text)
+                        text = f'Мы оповестили клиента, что можем доставить за {time_text} на указанный адрес'
+                        BOT.sendMessage(chat_id=service_uid, text=text)
+                    except ValueError:
+                        text = 'К сожалению, ресторан не сможет осуществить доставку на указанный адрес'
+                        BOT.sendMessage(chat_id=uid, text=text)
+                        text = 'Мы оповестили клиента о невозможности осуществления доставки на указанный адрес'
+                        BOT.sendMessage(chat_id=service_uid, text=text)
+
                 elif re.search(r'^stat_[0-9]+$', data):
                     stat_id = int(data.split('_')[1])
                     stat_data = db.session.query(Order).all()
@@ -1077,6 +1107,32 @@ def index():
                                 BOT.send_message(chat_id=chat_id,
                                                  text=text,
                                                  reply_markup=InlineKeyboardMarkup(buttons))
+                            elif 'Укажите адрес доставки для ресторана' in bot_msg:
+                                rest_name = bot_msg.split(' ')[5]
+                                bot_msg = db.session.query(History).filter_by(message_id=message_id - 2,
+                                                                              is_bot=False).first().message_text
+                                address = message
+                                rest = Restaurant.query.filter_by(name=rest_name).first()
+                                text = 'Запрос отправлен в ресторан, ожидайте'
+                                BOT.sendMessage(chat_id=chat_id, text=text)
+                                text = f'Клиент хочет узнать время доставки, укажите примерное время.\n'\
+                                       f'Адрес доставки: {address}'
+                                cb_text = 'Можем доставить за'
+                                cb_text_no = 'Не можем доставить на этот адрес'
+                                cb_data = f'rest_{rest.id}_uid_{chat_id}_delivery_time'
+                                buttons = [
+                                    [InlineKeyboardButton(f'{cb_text} 30 минут', callback_data=f'{cb_data}_30')],
+                                    [InlineKeyboardButton(f'{cb_text} 1 час', callback_data=f'{cb_data}_60')],
+                                    [InlineKeyboardButton(f'{cb_text} 2 часа', callback_data=f'{cb_data}_120')],
+                                    [InlineKeyboardButton(f'{cb_text} 3 часа', callback_data=f'{cb_data}_180')],
+                                    [InlineKeyboardButton(f'{cb_text} 4 часа', callback_data=f'{cb_data}_240')],
+                                    [InlineKeyboardButton(cb_text_no, callback_data=f'{cb_data}_no')]
+                                ]
+                                BOT.sendMessage(
+                                    chat_id=rest.service_uid,
+                                    text=text,
+                                    reply_markup=InlineKeyboardMarkup(buttons)
+                                )
                         except TypeError:
                             print('TypeError')
                             print("We can't handle this message", message)
