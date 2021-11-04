@@ -65,8 +65,14 @@ def index():
             # Callback handlers
             if get_value("callback_query", r):
                 data = r['callback_query']['data']
+                print(data)
                 buttons = []
-                message_id = r['callback_query']['message']['message_id']
+                if History.query.filter_by(message_id=r['callback_query']['message']['message_id']):
+                    message_id = r['callback_query']['message']['message_id']
+                else:
+                    message_id = History.query.filter_by(chat_id=chat_id).order_by(History.message_id.desc()).first()
+                    message_id = message_id.message_id
+                print(message_id)
                 if re.search(r'(restaurant_[0-9]+$)|'
                              r'(restaurant_[0-9]+_menu$)', data):
                     rest_id = int(data.split('_')[1])
@@ -205,7 +211,7 @@ def index():
                         BOT.editMessageText(
                             chat_id=cur_chat_id,
                             text=text,
-                            message_id=cur_msg_id,
+                            message_id=message_id,
                             reply_markup=InlineKeyboardMarkup(buttons),
                             parse_mode=ParseMode.HTML
                         )
@@ -1235,7 +1241,6 @@ def admin():
         dish_form.img_file.data.save(static_path + img_file)
         img_link = BASE_URL + static_path + img_file
         category = dish_form.category.data
-
         dish = Dish(
             name=name,
             cost=cost,
@@ -1252,7 +1257,6 @@ def admin():
     elif category_form.validate_on_submit() and category_form.category_add_submit.data:
         name = category_form.name.data
         restaurant_id = category_form.restaurant_id.data
-
         category = Category(name=name, restaurant_id=restaurant_id)
         db.session.add(category)
         db.session.commit()

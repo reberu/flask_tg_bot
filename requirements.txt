@@ -8,6 +8,7 @@ Flask==1.1.4
 Flask-Login==0.5.0
 Flask-Script==2.0.6
 Flask-SQLAlchemy==2.5.1
+Flask-WTF==0.15.1
 greenlet==1.1.1
 idna==2.10
 itsdangerous==1.1.0
@@ -19,6 +20,7 @@ requests==2.25.1
 six==1.16.0
 SQLAlchemy==1.4.23
 tornado==6.1
+transliterate==1.10.2
 tzlocal==2.1
 urllib3==1.26.6
 Werkzeug==1.0.1
