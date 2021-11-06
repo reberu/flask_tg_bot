@@ -65,8 +65,14 @@ def index():
             # Callback handlers
             if get_value("callback_query", r):
                 data = r['callback_query']['data']
+                print(data)
                 buttons = []
-                message_id = r['callback_query']['message']['message_id']
+                if History.query.filter_by(message_id=r['callback_query']['message']['message_id']):
+                    message_id = r['callback_query']['message']['message_id']
+                else:
+                    message_id = History.query.filter_by(chat_id=chat_id).order_by(History.message_id.desc()).first()
+                    message_id = message_id.message_id
+                print(message_id)
                 if re.search(r'(restaurant_[0-9]+$)|'
                              r'(restaurant_[0-9]+_menu$)', data):
                     rest_id = int(data.split('_')[1])
@@ -205,7 +211,7 @@ def index():
                         BOT.editMessageText(
                             chat_id=cur_chat_id,
                             text=text,
-                            message_id=cur_msg_id,
+                            message_id=message_id,
                             reply_markup=InlineKeyboardMarkup(buttons),
                             parse_mode=ParseMode.HTML
                         )
@@ -545,6 +551,10 @@ def index():
                                                   callback_data=f'order_accept_{order.id}_120')],
                             [InlineKeyboardButton('Принять и доставить за 3 часа',
                                                   callback_data=f'order_accept_{order.id}_180')],
+                            [InlineKeyboardButton('Принять и доставить за 4 часа',
+                                                  callback_data=f'order_accept_{order.id}_240')],
+                            [InlineKeyboardButton('Принять и доставить в договоренное время',
+                                                  callback_data=f'order_accept_{order.id}_0')],
                             [InlineKeyboardButton('Не принят', callback_data='None')],
                             [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                         ]
@@ -553,14 +563,15 @@ def index():
                     except IndexError:
                         BOT.send_message(chat_id=113737020, text='Произошла ошибка IndexError в order_confirm')
 
-                elif re.search(r'^order_accept_[0-9]+_(30|60|120|180)$', data):
+                elif re.search(r'^order_accept_[0-9]+_(30|60|120|180|240|0)$', data):
                     order_id = int(data.split('_')[2])
                     time = int(data.split('_')[3])
                     order = db.session.query(Order).filter_by(id=order_id).first()
                     text = f'Ресторан принял ваш заказ № {order.id} и доставит '
                     time_text = ''
                     current_tz = pytz.timezone('Asia/Yakutsk')
-                    sched_time = current_tz.localize(datetime.now() + timedelta(minutes=time))
+                    if time > 0:
+                        sched_time = current_tz.localize(datetime.now() + timedelta(minutes=time))
                     if time == 30:
                         time_text += 'в течении 30 минут'
                     elif time == 60:
@@ -569,6 +580,10 @@ def index():
                         time_text += 'в течении 2 часов'
                     elif time == 180:
                         time_text += 'в течении 3 часов'
+                    elif time == 240:
+                        time_text += 'в течении 3 часов'
+                    elif time == 0:
+                        time_text += 'в договоренное время'
                     BOT.send_message(chat_id=order.uid, text=text + time_text)
                     service_uid = db.session.query(Restaurant.service_uid).filter_by(id=order.order_rest_id).first()[0]
                     client = db.session.query(User).filter_by(uid=order.uid).first()
@@ -590,7 +605,11 @@ def index():
                                               callback_data=f'order_accept_{order.id}_120')],
                         [InlineKeyboardButton('Принять и доставить за 3 часа',
                                               callback_data=f'order_accept_{order.id}_180')],
-                        [InlineKeyboardButton('Заказ принят', callback_data='None')],
+                        [InlineKeyboardButton('Принять и доставить за 4 часа',
+                                              callback_data=f'order_accept_{order.id}_240')],
+                        [InlineKeyboardButton('Принять и доставить в договоренное время',
+                                              callback_data=f'order_accept_{order.id}_0')],
+                        [InlineKeyboardButton(f'Принят на доставку {time_text}', callback_data='None')],
                         [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                     ]
                     BOT.editMessageText(
@@ -715,6 +734,10 @@ def index():
                                                   callback_data=f'order_accept_{order.id}_120')],
                             [InlineKeyboardButton('Принять и доставить за 3 часа',
                                                   callback_data=f'order_accept_{order.id}_180')],
+                            [InlineKeyboardButton('Принять и доставить за 4 часа',
+                                                  callback_data=f'order_accept_{order.id}_240')],
+                            [InlineKeyboardButton('Принять и доставить в договоренное время',
+                                                  callback_data=f'order_accept_{order.id}_0')],
                             [InlineKeyboardButton('Не принят', callback_data='None')],
                             [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                         ]
@@ -739,6 +762,10 @@ def index():
                                                   callback_data=f'order_accept_{order.id}_120')],
                             [InlineKeyboardButton('Принять и доставить за 3 часа',
                                                   callback_data=f'order_accept_{order.id}_180')],
+                            [InlineKeyboardButton('Принять и доставить за 4 часа',
+                                                  callback_data=f'order_accept_{order.id}_240')],
+                            [InlineKeyboardButton('Принять и доставить в договоренное время',
+                                                  callback_data=f'order_accept_{order.id}_0')],
                             [InlineKeyboardButton('Не принят', callback_data='None')],
                             [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                         ]
@@ -1214,7 +1241,6 @@ def admin():
         dish_form.img_file.data.save(static_path + img_file)
         img_link = BASE_URL + static_path + img_file
         category = dish_form.category.data
-
         dish = Dish(
             name=name,
             cost=cost,
@@ -1231,7 +1257,6 @@ def admin():
     elif category_form.validate_on_submit() and category_form.category_add_submit.data:
         name = category_form.name.data
         restaurant_id = category_form.restaurant_id.data
-
         category = Category(name=name, restaurant_id=restaurant_id)
         db.session.add(category)
         db.session.commit()

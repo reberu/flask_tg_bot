@@ -32,7 +32,7 @@ class DishForm(FlaskForm):
 
 class CategoryForm(FlaskForm):
     name = StringField("Наименование", validators=[DataRequired()])
-    restaurant_id = IntegerField("Идентификатор ресторана", validators=[DataRequired()])
+    restaurant_id = IntegerField("Идентификатор ресторана", validators=[DataRequired()], id="id_cat_add_rest_id")
     category_add_submit = SubmitField("Добавить")
 
     def __init__(self, *args, **kwargs):
@@ -44,7 +44,7 @@ class CategoryForm(FlaskForm):
 
 class DishDeleteForm(FlaskForm):
     delete_id = HiddenField("Hidden dish id")
-    dish_delete_submit = SubmitField("Удалить")
+    dish_delete_submit = SubmitField("Удалить", id="id_dish_delete_submit")
 
 
 class RestaurantForm(FlaskForm):
@@ -62,7 +62,7 @@ class RestaurantEditForm(FlaskForm):
     address = StringField("Адрес")
     contact = StringField("Контактный номер")
     passwd = StringField("Кодовая фраза")
-    rest_edit_submit = SubmitField("Отправить")
+    rest_edit_submit = SubmitField("Отправить", id="id_rest_edit_submit")
 
 
 class RestaurantDeleteForm(FlaskForm):

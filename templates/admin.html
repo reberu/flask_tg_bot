@@ -45,55 +45,61 @@
                         </div>
                         <div id="collapse{{ restaurant.id }}" class="collapse" aria-labelledby="heading{{ restaurant.id }}" data-parent="#accordionRests">
                             <div class="card-body">
-                                <div class="d-flex justify-content-start align-items-center">
-                                    <div class="p-2 flex-fill bd-highlight">Название блюда</div>
-                                    <div class="p-2 flex-fill bd-highlight">Стоимость</div>
-                                    <div class="p-2 flex-fill bd-highlight">Описание</div>
-                                    <div class="p-2 flex-fill bd-highlight">Категория</div>
-                                    <div class="p-2 flex-fill bd-highlight">Изображение</div>
-                                    <div class="p-2 flex-fill bd-highlight"></div>
-                                    </div>
-                                {% for dish in dishes %}
-                                    {% if dish.id_rest == restaurant.id %}
-                                        <div class="d-flex justify-content-start align-items-center">
-                                            <div class="p-2 flex-fill bd-highlight">{{ dish.name }}</div>
-                                            <div class="p-2 flex-fill bd-highlight">{{ dish.cost }}</div>
-                                            <div class="p-2 flex-fill bd-highlight">{{ dish.composition }}</div>
-                                            <div class="p-2 flex-fill bd-highlight">{{ dish.category }}</div>
-                                            <div class="p-2 flex-fill bd-highlight"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></div>
-                                            <div class="p-2 flex-fill bd-highlight">
-                                                <form method="post">
-                                                    {{ dish_delete_form.csrf_token }}
-                                                    {{ dish_delete_form.delete_id(value=dish.id) }}
-                                                    {{ dish_delete_form.dish_delete_submit(class="btn btn-danger") }}
-                                                </form>
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                {% endfor %}
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Название блюда</th>
+                                            <th scope="col">Стоимость</th>
+                                            <th scope="col">Описание</th>
+                                            <th scope="col">Категория</th>
+                                            <th scope="col">Изображение</th>
+                                            <th scope="col"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for dish in dishes %}
+                                            {% if dish.id_rest == restaurant.id %}
+                                                <tr>
+                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
+                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
+                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
+                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
+                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                    <td style="vertical-align: middle;">
+                                                        <form method="post">
+                                                            {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
+                                                            {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
+                                                            {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                                 <button id="btnRestEdit{{ restaurant.id }}" type="button">Изменить данные ресторана</button>
                                 <form id="restEdit{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
                                     <table>
-                                        {{ restaurant_edit_form.csrf_token }}
-                                        {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;") }}
+                                        {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_edit_form_csrf") }}
+                                        {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;", id="restaurant" + restaurant.id|string + "_edit_form_id_field") }}
                                         <tr>
                                             <td>{{ restaurant_edit_form.name.label }}</td>
-                                            <td>{{ restaurant_edit_form.name(size="50") }}</td>
+                                            <td>{{ restaurant_edit_form.name(size="50", id="rest" + restaurant.id|string + "_name_field") }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.address.label }}</td>
-                                            <td>{{ restaurant_edit_form.address(size="50") }}</td>
+                                            <td>{{ restaurant_edit_form.address(size="50", id="rest" + restaurant.id|string + "_address_field") }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.contact.label }}</td>
-                                            <td>{{ restaurant_edit_form.contact(size="50") }}</td>
+                                            <td>{{ restaurant_edit_form.contact(size="50", id="rest" + restaurant.id|string + "_contact_field") }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.passwd.label }}</td>
-                                            <td>{{ restaurant_edit_form.passwd(size="50") }}</td>
+                                            <td>{{ restaurant_edit_form.passwd(size="50", id="rest" + restaurant.id|string + "_passwd_field") }}</td>
                                         </tr>
                                         <tr>
-                                            <td>{{ restaurant_edit_form.rest_edit_submit(class="btn btn-warning") }}</td>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(class="btn btn-warning", id="restaurant" + restaurant.id|string + "_edit_submit_field") }}</td>
                                         </tr>
                                     </table>
                                 </form>
@@ -103,42 +109,83 @@
                 </div>
             {% endfor %}
         {% else %}
+            {% for restaurant in restaurants %}
+                {% if restaurant.name == current_user.ownership %}
+                    {% set ns.rest_id = restaurant.id %}
+                {% endif %}
+            {% endfor %}
             <ul>Вы администратор ресторана {{ current_user.ownership }}</ul>
-            <table style="margin-bottom:1%">
-                <tr>
-                    <th>Название блюда</th>
-                    <th>Стоимость</th>
-                    <th>Описание</th>
-                    <th>Категория</th>
-                    <th>Изображение</th>
-                    <th></th>
-                </tr>
-                {% for restaurant in restaurants %}
+            <div class="accordion" id="accordionDishes">
+                <div class="card">
+                    <div class="card-header" id="headingDishes">
+                        <h5 class="mb-0">
+                            <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseDishes" aria-expanded="false" aria-controls="collapseDishes">
+                                Показать блюда
+                            </button>
+                        </h5>
+                    </div>
+                    <div id="collapseDishes" class="collapse" aria-labelledby="headingDishes" data-parent="#accordionDishes">
+                        <div class="card-body">
+                            <div class="accordion" id="accordionCategories">
+                                {% for restaurant in restaurants %}
+                                    {% if current_user.ownership == restaurant.name %}
+                                        {% for category in categories %}
+                                            {% if category.restaurant_id == restaurant.id %}
+                                                <div class="card">
+                                                    <div class="card-header" id="headingCategory{{category.id}}">
+                                                        <h5 class="mb-0">
+                                                            <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseCategory{{category.id}}" aria-expanded="false" aria-controls="collapseCategory{{category.id}}">
+                                                                {{ category.name }}
+                                                            </button>
+                                                        </h5>
+                                                    </div>
+                                                    <div id="collapseCategory{{category.id}}" class="collapse" aria-labelledby="headingCategory{{category.id}}" data-parent="#accordionCategories">
+                                                        <div class="card-body">
+                                                            <table class="table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th scope="col">Название блюда</th>
+                                                                        <th scope="col">Стоимость</th>
+                                                                        <th scope="col">Описание</th>
+                                                                        <th scope="col">Категория</th>
+                                                                        <th scope="col">Изображение</th>
+                                                                        <th scope="col"></th>
+                                                                    </tr>
+                                                                </thead>
+                                                            {% for dish in dishes %}
+                                                                {% if dish.id_rest == restaurant.id and dish.category == category.name %}
+                                                                    <tbody>
+                                                                        <tr>
+                                                                            <td style="vertical-align: middle;">{{ dish.name }}</td>
+                                                                            <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
+                                                                            <td style="vertical-align: middle;">{{ dish.composition }}</td>
+                                                                            <td style="vertical-align: middle;">{{ dish.category }}</td>
+                                                                            <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                            <td style="vertical-align: middle;">
+                                                                                <form method="post">
+                                                                                    {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
+                                                                                    {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
+                                                                                    {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
+                                                                                </form>
+                                                                            </td>
+                                                                        </tr>
+                                                                    </tbody>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                    {% if current_user.ownership == restaurant.name %}
-
-                        {% set ns.rest_id = restaurant.id %}
-                        {% for dish in dishes|sort(attribute='category') %}
-                            {% if dish.id_rest == ns.rest_id %}
-                            <tr>
-                                <td>{{ dish.name }}</td>
-                                <td>{{ dish.cost }} р.</td>
-                                <td>{{ dish.composition }}</td>
-                                <td>{{ dish.category }}</td>
-                                <td><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
-                                <td>
-                                    <form method="post">
-                                        {{ dish_delete_form.csrf_token }}
-                                        {{ dish_delete_form.delete_id(value=dish.id) }}
-                                        {{ dish_delete_form.dish_delete_submit(class="btn btn-danger") }}
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endif %}
-                        {% endfor %}
-                    {% endif %}
-                {% endfor %}
-            </table>
         {% endif %}
     <div class="accordion" id="accordionExample">
         <div class="card">
@@ -153,11 +200,11 @@
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data">
 
-                        {{ dish_form.csrf_token() }}
-                        <table>
+                        {{ dish_form.csrf_token(id="dish_add_form_csrf") }}
+                        <table class="table">
                             <tr>
                                 <td>{{ dish_form.name.label }}</td>
-                                <td>{{ dish_form.name }}</td>
+                                <td>{{ dish_form.name(id="dish_add_name_field") }}</td>
                             </tr>
                             <tr>
                                 <td>{{ dish_form.cost.label }}</td>
@@ -178,8 +225,8 @@
                             <tr>
                                 {% if current_user.ownership != 'all' %}
                                     {% if ns.rest_id != 0 %}
-                                            {{ dish_form.id_rest(value=ns.rest_id) }}
-                                        {% endif %}
+                                        {{ dish_form.id_rest(value=ns.rest_id) }}
+                                    {% endif %}
                                 {% else %}
                                     <td>{{ dish_form.id_rest.label }}</td>
                                     <td>{{ dish_form.id_rest }}</td>
@@ -204,28 +251,28 @@
             <div id="collapseThree" class="collapse" aria-labelledby="headingThree" data-parent="#accordionExample">
                 <div class="card-body">
                     <form action="" method="post">
-                        {{ category_form.csrf_token() }}
+                        {{ category_form.csrf_token(id="category_add_form_csrf") }}
 
-                        <table>
+                        <table class="table">
                             {% if ns.rest_id != 0 %}
-                            <tr>
-                                <td>{{ category_form.name.label }}</td>
-                                <td>{{ category_form.name }}</td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    {{ category_form.restaurant_id(value=ns.rest_id) }}
-                                </td>
-                            </tr>
+                                <tr>
+                                    <td>{{ category_form.name.label }}</td>
+                                    <td>{{ category_form.name(id="rest" + ns.rest_id|string + "_category_add_name_field") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        {{ category_form.restaurant_id(value=ns.rest_id) }}
+                                    </td>
+                                </tr>
                             {% else %}
-                            <tr>
-                                <td>{{ category_form.restaurant_id.label }}</td>
-                                <td>{{ category_form.restaurant_id }}</td>
-                            </tr>
-                            <tr>
-                                <td>{{ category_form.name.label }}</td>
-                                <td>{{ category_form.name }}</td>
-                            </tr>
+                                <tr>
+                                    <td>{{ category_form.restaurant_id.label }}</td>
+                                    <td>{{ category_form.restaurant_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ category_form.name.label }}</td>
+                                    <td>{{ category_form.name(id="rest" + ns.rest_id|string + "_category_add_name_field") }}</td>
+                                </tr>
                             {% endif %}
 
                             <tr>
@@ -247,12 +294,12 @@
             <div id="collapseFour" class="collapse" aria-labelledby="headingFour" data-parent="#accordionExample">
                 <div class="card-body">
                     <form action="" method="post">
-                        {{ category_delete_form.csrf_token() }}
-                        <table>
+                        {{ category_delete_form.csrf_token(id="category_delete_form_csrf") }}
+                        <table class="table">
                             <tr>
                                 <td>{{ category_delete_form.name.label }}</td>
                                 <td>
-                                    {{ category_delete_form.name }}
+                                    {{ category_delete_form.name(id="category_delete_name_field") }}
                                 </td>
                             </tr>
                             <tr>
@@ -286,72 +333,71 @@
                 <div id="collapseFive" class="collapse" aria-labelledby="headingFive" data-parent="#accordionExample">
                     <div class="card-body">
                         <p>Можете внести изменения в любое поле</p>
-                {% for term in delivery_terms %}
-                    {% if term.rest_id == ns.rest_id %}
-                        <!--Here we need to show edit form-->
-                        <form method="post" enctype="multipart/form-data">
-                            {{ rest_delivery_terms_edit_form.csrf_token() }}
-                            <table>
-                                {{ rest_delivery_terms_edit_form.rest_id(value=ns.rest_id) }}
-                                <tr>
-                                    <td>{{ rest_delivery_terms_edit_form.terms.label }}</td>
-                                    <td>{{ rest_delivery_terms_edit_form.terms }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_inn.label }}</td>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_inn }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_ogrn.label }}</td>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_ogrn }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_fullname.label }}</td>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_fullname }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_address.label }}</td>
-                                    <td>{{ rest_delivery_terms_edit_form.rest_address }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_edit_form.terms_edit_submit }}</td>
-                                </tr>
-                            </table>
-                        </form>
-                    {% else %}
-                        <form method="post" enctype="multipart/form-data">
-                            {{ rest_delivery_terms_form.csrf_token() }}
-                            <table>
-
-                                {{ rest_delivery_terms_form.rest_id(value=ns.rest_id) }}
-                                <tr>
-                                    <td>{{ rest_delivery_terms_form.terms.label }}</td>
-                                    <td>{{ rest_delivery_terms_form.terms }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_form.rest_inn.label }}</td>
-                                    <td>{{ rest_delivery_terms_form.rest_inn }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_form.rest_ogrn.label }}</td>
-                                    <td>{{ rest_delivery_terms_form.rest_ogrn }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_form.rest_fullname.label }}</td>
-                                    <td>{{ rest_delivery_terms_form.rest_fullname }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_form.rest_address.label }}</td>
-                                    <td>{{ rest_delivery_terms_form.rest_address }}</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ rest_delivery_terms_form.delivery_terms_submit }}</td>
-                                </tr>
-                            </table>
-                        </form>
-                    {% endif %}
+                        {% for term in delivery_terms %}
+                            {% if term.rest_id == ns.rest_id %}
+                                <!--Here we need to show edit form-->
+                                <form method="post" enctype="multipart/form-data">
+                                    {{ rest_delivery_terms_edit_form.csrf_token(id="rest_delivery_form_csrf") }}
+                                    <table class="table">
+                                        {{ rest_delivery_terms_edit_form.rest_id(value=ns.rest_id) }}
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_edit_form.terms.label }}</td>
+                                            <td>{{ rest_delivery_terms_edit_form.terms }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_inn.label }}</td>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_inn }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_ogrn.label }}</td>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_ogrn }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_fullname.label }}</td>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_fullname(id="rest" + ns.rest_id|string + "_delivery_terms_fullname_field") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_address.label }}</td>
+                                            <td>{{ rest_delivery_terms_edit_form.rest_address }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_edit_form.terms_edit_submit }}</td>
+                                        </tr>
+                                    </table>
+                                </form>
+                            {% else %}
+                                <form method="post" enctype="multipart/form-data">
+                                    {{ rest_delivery_terms_form.csrf_token() }}
+                                    <table class="table">
+                                        {{ rest_delivery_terms_form.rest_id(value=ns.rest_id) }}
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_form.terms.label }}</td>
+                                            <td>{{ rest_delivery_terms_form.terms }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_form.rest_inn.label }}</td>
+                                            <td>{{ rest_delivery_terms_form.rest_inn }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_form.rest_ogrn.label }}</td>
+                                            <td>{{ rest_delivery_terms_form.rest_ogrn }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_form.rest_fullname.label }}</td>
+                                            <td>{{ rest_delivery_terms_form.rest_fullname(id="rest" + ns.rest_id|string + "_delivery_terms_fullname_field") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_form.rest_address.label }}</td>
+                                            <td>{{ rest_delivery_terms_form.rest_address }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ rest_delivery_terms_form.delivery_terms_submit }}</td>
+                                        </tr>
+                                    </table>
+                                </form>
+                            {% endif %}
+                        {% endfor %}
                     </div>
-                {% endfor %}
                 </div>
             </div>
         {% endif %}
@@ -369,11 +415,11 @@
                 <div id="collapseRest" class="collapse" aria-labelledby="headingRest" data-parent="#accordionRest">
                     <div class="card-body">
                         <form method="post" enctype="multipart/form-data">
-                            {{ restaurant_form.csrf_token() }}
-                            <table>
+                            {{ restaurant_form.csrf_token(id="restaurant_add_form_csrf") }}
+                            <table class="table">
                                 <tr>
                                     <td>{{ restaurant_form.name.label }}</td>
-                                    <td>{{ restaurant_form.name }}</td>
+                                    <td>{{ restaurant_form.name(id="rest_add_name_field") }}</td>
                                 </tr>
                                 <tr>
                                     <td>{{ restaurant_form.address.label }}</td>
@@ -385,7 +431,7 @@
                                 </tr>
                                 <tr>
                                     <td>{{ restaurant_form.passwd.label }}</td>
-                                    <td>{{ restaurant_form.passwd }}</td>
+                                    <td>{{ restaurant_form.passwd(id="rest_add_passwd_field") }}</td>
                                 </tr>
                                 <tr>
                                     {{ restaurant_form.service_uid(value=None) }}
@@ -409,11 +455,11 @@
                 <div id="collapseRestDelete" class="collapse" aria-labelledby="headingRestDelete" data-parent="#accordionRest">
                     <div class="card-body">
                         <form method="post" enctype="multipart/form-data">
-                            {{ restaurant_delete_form.csrf_token() }}
-                            <table>
+                            {{ restaurant_delete_form.csrf_token(id="restaurant_delete_form_csrf") }}
+                            <table class="table">
                                 <tr>
                                     <td>{{ restaurant_delete_form.name.label }}</td>
-                                    <td>{{ restaurant_delete_form.name }}</td>
+                                    <td>{{ restaurant_delete_form.name(id="rest_delete_name_field") }}</td>
                                 </tr>
                                 <tr>
                                     <td>{{ restaurant_delete_form.rest_delete_submit }}</td>
@@ -468,8 +514,8 @@
                 <div id="collapseAdminAdd" class="collapse" aria-labelledby="adminAdd" data-parent="#accordionRest">
                     <div class="card-body">
                         <form method="POST" enctype="multipart/form-data">
-                            <table>
-                                {{ admin_add_form.csrf_token }}
+                            <table class="table">
+                                {{ admin_add_form.csrf_token(id="admin_add_form_csrf") }}
                                 <tr>
                                     <td>{{ admin_add_form.username.label }}</td>
                                     <td>{{ admin_add_form.username(size="50") }}</td>
