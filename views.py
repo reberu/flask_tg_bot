@@ -4,7 +4,7 @@ from os.path import isdir
 
 import pytz
 import telegram.error
-from flask import render_template, flash, redirect, url_for
+from flask import render_template, flash, redirect, url_for, jsonify
 from telegram import Bot, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, KeyboardButton
 from telegram import error
 
@@ -1207,6 +1207,7 @@ def logout():
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin():
+    print(request.form)
     dishes = db.session.query(Dish).all()
     restaurants = db.session.query(Restaurant).all()
     categories = db.session.query(Category).all()
@@ -1283,6 +1284,14 @@ def admin():
         return redirect(url_for('admin'))
 
     elif category_delete_form.validate_on_submit() and category_delete_form.category_delete_submit.data:
+        name = category_delete_form.name.data
+        restaurant_id = category_delete_form.restaurant_id.data
+        db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
+        db.session.commit()
+        flash("Категория успешно удалена", "success")
+        return redirect(url_for('admin'))
+
+    elif category_delete_form.is_submitted() and category_delete_form.category_delete_submit.data:
         name = category_delete_form.name.data
         restaurant_id = category_delete_form.restaurant_id.data
         db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()

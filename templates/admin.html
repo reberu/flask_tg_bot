@@ -293,7 +293,7 @@
             </div>
             <div id="collapseFour" class="collapse" aria-labelledby="headingFour" data-parent="#accordionExample">
                 <div class="card-body">
-                    <form action="" method="post">
+                    <form method="post">
                         {{ category_delete_form.csrf_token(id="category_delete_form_csrf") }}
                         <table class="table">
                             <tr>
@@ -320,6 +320,18 @@
                     </form>
                 </div>
             </div>
+            <script>
+                if ({{ ns.rest_id|int }} != 0) {
+                    let category_select = document.getElementById('category_delete_name_field');
+                    let optionHTML = '';
+                        {% for category in categories %}
+                            {% if category.restaurant_id == ns.rest_id %}
+                                optionHTML += '<option value="{{ category.name }}">{{ category.name }}</option>';
+                            {% endif%}
+                        {% endfor %}
+                    category_select.innerHTML = optionHTML;
+                }
+            </script>
         </div>
         {% if current_user.ownership != 'all' %}
             <div class="card">
