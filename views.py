@@ -1227,42 +1227,51 @@ def admin():
         dish_form = DishForm(hide_rest=False)
         category_form = CategoryForm(hide_rest_id=False)
         category_delete_form = CategoryDeleteForm(hide_rest_id=False)
-    if dish_form.validate_on_submit() and dish_form.dish_add_submit.data:
-        name = dish_form.name.data
-        cost = dish_form.cost.data
-        composition = dish_form.composition.data
-        id_rest = dish_form.id_rest.data
-        if re.search('[а-яА-Я]', dish_form.img_file.data.filename):
-            img_file = secure_filename(translit(dish_form.img_file.data.filename, reversed=True))
-        else:
-            img_file = secure_filename(dish_form.img_file.data.filename)
-        static_path = 'static/' + str(id_rest) + '/'
-        if not isdir(static_path):
-            mkdir(static_path)
-        dish_form.img_file.data.save(static_path + img_file)
-        img_link = BASE_URL + static_path + img_file
-        category = dish_form.category.data
-        dish = Dish(
-            name=name,
-            cost=cost,
-            composition=composition,
-            img_link=img_link,
-            category=category,
-            id_rest=id_rest
-        )
-        db.session.add(dish)
-        db.session.commit()
-        flash("Блюдо добавлено", "success")
-        return redirect(url_for('admin'))
+    if dish_form.dish_add_submit.data:
+        if dish_form.validate_on_submit() or dish_form.is_submitted():
+            name = dish_form.name.data
+            cost = dish_form.cost.data
+            composition = dish_form.composition.data
+            if current_user.ownership == 'all':
+                id_rest = request.form['dish_add_rest_selector']
+            else:
+                id_rest = dish_form.id_rest.data
+                category = request.form['dish_add_category_selector']
+            if re.search('[а-яА-Я]', dish_form.img_file.data.filename):
+                img_file = secure_filename(translit(dish_form.img_file.data.filename, reversed=True))
+            else:
+                img_file = secure_filename(dish_form.img_file.data.filename)
+            static_path = 'static/' + str(id_rest) + '/'
+            if not isdir(static_path):
+                mkdir(static_path)
+            dish_form.img_file.data.save(static_path + img_file)
+            img_link = BASE_URL + static_path + img_file
 
-    elif category_form.validate_on_submit() and category_form.category_add_submit.data:
-        name = category_form.name.data
-        restaurant_id = category_form.restaurant_id.data
-        category = Category(name=name, restaurant_id=restaurant_id)
-        db.session.add(category)
-        db.session.commit()
-        flash("Категория добавлена", "success")
-        return redirect(url_for('admin'))
+            dish = Dish(
+                name=name,
+                cost=cost,
+                composition=composition,
+                img_link=img_link,
+                category=category,
+                id_rest=id_rest
+            )
+            db.session.add(dish)
+            db.session.commit()
+            flash("Блюдо добавлено", "success")
+            return redirect(url_for('admin'))
+
+    elif category_form.category_add_submit.data:
+        if category_form.validate_on_submit() or category_form.is_submitted():
+            name = category_form.name.data
+            if current_user.ownership == 'all':
+                restaurant_id = request.form['category_add_rest_selector']
+            else:
+                restaurant_id = category_form.restaurant_id.data
+            category = Category(name=name, restaurant_id=restaurant_id)
+            db.session.add(category)
+            db.session.commit()
+            flash("Категория добавлена", "success")
+            return redirect(url_for('admin'))
 
     elif dish_delete_form.validate_on_submit() and dish_delete_form.dish_delete_submit.data:
         dish_id = dish_delete_form.delete_id.data
@@ -1283,13 +1292,17 @@ def admin():
         flash("Ресторан добавлен", "success")
         return redirect(url_for('admin'))
 
-    elif category_delete_form.validate_on_submit() and category_delete_form.category_delete_submit.data:
-        name = category_delete_form.name.data
-        restaurant_id = category_delete_form.restaurant_id.data
-        db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
-        db.session.commit()
-        flash("Категория успешно удалена", "success")
-        return redirect(url_for('admin'))
+    elif category_delete_form.category_delete_submit.data:
+        if category_delete_form.validate_on_submit() or category_delete_form.is_submitted():
+            name = category_delete_form.name.data
+            if current_user.ownership == 'all':
+                restaurant_id = request.form['category_del_rest_selector']
+            else:
+                restaurant_id = category_delete_form.restaurant_id.data
+            db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
+            db.session.commit()
+            flash("Категория успешно удалена", "success")
+            return redirect(url_for('admin'))
 
     elif category_delete_form.is_submitted() and category_delete_form.category_delete_submit.data:
         name = category_delete_form.name.data
@@ -1324,20 +1337,21 @@ def admin():
         db.session.commit()
         return redirect(url_for('admin'))
 
-    elif admin_add_form.validate_on_submit() and admin_add_form.admin_add_button.data:
-        username = admin_add_form.username.data
-        passwd = admin_add_form.passwd.data
-        mail = admin_add_form.email.data
-        ownership = admin_add_form.ownership.data
-        usr = Admin(
-            username=username,
-            email=mail,
-            password=passwd,
-            ownership=ownership
-        )
-        db.session.add(usr)
-        db.session.commit()
-        return redirect(url_for('admin'))
+    elif admin_add_form.admin_add_button.data:
+        if admin_add_form.validate_on_submit() or admin_add_form.is_submitted():
+            username = admin_add_form.username.data
+            passwd = admin_add_form.passwd.data
+            mail = admin_add_form.email.data
+            ownership = request.form['admin_add_rest_selector']
+            usr = Admin(
+                username=username,
+                email=mail,
+                password=passwd,
+                ownership=ownership
+            )
+            db.session.add(usr)
+            db.session.commit()
+            return redirect(url_for('admin'))
 
     elif rest_delivery_terms_form.validate_on_submit() and rest_delivery_terms_form.delivery_terms_submit.data:
         rest_id = rest_delivery_terms_form.rest_id.data
