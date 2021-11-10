@@ -342,30 +342,49 @@
                     <form method="post">
                         {{ category_delete_form.csrf_token(id="category_delete_form_csrf") }}
                         <table class="table">
+                            {% if current_user.ownership != 'all' %}
                             <tr>
-                                {% if ns.rest_id != 0 %}
-                                    <td>
-                                        {{ category_delete_form.restaurant_id(value=ns.rest_id) }}
-                                    </td>
-                                {% else %}
-                                    <td>Укажите ресторан</td>
-                                    <td>
-                                        <select id="category_del_rest_selector" name="category_del_rest_selector" onchange="showCategories();" required>
-                                            <option selected disabled hidden></option>
-                                            {% for restaurant in restaurants %}
-                                                <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        {{ category_delete_form.restaurant_id(hidden=True) }}
-                                    </td>
-                                {% endif %}
+                                <td>
+                                    {{ category_delete_form.restaurant_id(value=ns.rest_id) }}
+                                </td>
                             </tr>
                             <tr>
                                 <td>{{ category_delete_form.name.label }}</td>
                                 <td>
-                                    {{ category_delete_form.name(id="category_delete_name_field") }}
+                                    <select id="category_rest_delete_select_field" name="category_rest_delete_select_field" required>
+                                        <option selected disabled hidden></option>
+                                        {% for category in categories %}
+                                            {% if category.restaurant_id == ns.rest_id %}
+                                                <option value="{{ category.name|safe }}">{{ category.name|safe }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    {{ category_delete_form.name(id="category_delete_name_field", hidden=True) }}
                                 </td>
                             </tr>
+                            {% else %}
+                            <tr>
+                                <td>Укажите ресторан</td>
+                                <td>
+                                    <select id="category_del_rest_selector" name="category_del_rest_selector" onchange="showCategories();" required>
+                                        <option selected disabled hidden></option>
+                                        {% for restaurant in restaurants %}
+                                            <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {{ category_delete_form.restaurant_id(hidden=True) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>{{ category_delete_form.name.label }}</td>
+                                <td>
+                                    <select id="category_delete_select_field" name="category_delete_select_field" required>
+                                        <option selected disabled hidden></option>
+                                    </select>
+                                    {{ category_delete_form.name(id="category_delete_name_field", hidden=True) }}
+                                </td>
+                            </tr>
+                            {% endif %}
                             <tr>
                                 <td>{{ category_delete_form.category_delete_submit }}</td>
                             </tr>
@@ -375,7 +394,7 @@
             </div>
             <script>
                 function showCategories() {
-                    let category_select = document.getElementById('category_delete_name_field');
+                    let category_select = document.getElementById('category_delete_select_field');
                     let optionHTML = '';
                     if ({{ ns.rest_id|int }} != 0) {
                         {% for category in categories %}
