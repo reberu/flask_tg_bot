@@ -19,8 +19,8 @@ class DishForm(FlaskForm):
     cost = IntegerField("Стоимость", validators=[DataRequired()])
     composition = StringField("Состав", validators=[DataRequired()])
     img_file = FileField("Загрузите изображение", validators=[DataRequired()])
-    category = StringField("Категория", validators=[DataRequired()])
-    id_rest = IntegerField("Идентификатор ресторана", validators=[DataRequired()])
+    category = StringField("Категория")
+    id_rest = IntegerField("Идентификатор ресторана")
     dish_add_submit = SubmitField("Добавить")
 
     def __init__(self, *args, **kwargs):
@@ -32,7 +32,7 @@ class DishForm(FlaskForm):
 
 class CategoryForm(FlaskForm):
     name = StringField("Наименование", validators=[DataRequired()])
-    restaurant_id = IntegerField("Идентификатор ресторана", validators=[DataRequired()], id="id_cat_add_rest_id")
+    restaurant_id = IntegerField("Идентификатор ресторана", id="id_cat_add_rest_id")
     category_add_submit = SubmitField("Добавить")
 
     def __init__(self, *args, **kwargs):
@@ -72,10 +72,9 @@ class RestaurantDeleteForm(FlaskForm):
 
 
 class CategoryDeleteForm(FlaskForm):
-    choices = [choice.name for choice in db.session.query(Category).all()]
+    choices = [''] + [choice.name for choice in db.session.query(Category).all()]
     name = SelectField("Название категории", choices=choices, validators=[DataRequired()])
-    # name = StringField("Название категории", validators=[DataRequired()])
-    restaurant_id = IntegerField("Идентификатор ресторана", validators=[DataRequired()])
+    restaurant_id = IntegerField("Идентификатор ресторана")
     category_delete_submit = SubmitField("Удалить")
 
     def __init__(self, *args, **kwargs):

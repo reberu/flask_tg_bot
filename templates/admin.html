@@ -45,41 +45,58 @@
                         </div>
                         <div id="collapse{{ restaurant.id }}" class="collapse" aria-labelledby="heading{{ restaurant.id }}" data-parent="#accordionRests">
                             <div class="card-body">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Название блюда</th>
-                                            <th scope="col">Стоимость</th>
-                                            <th scope="col">Описание</th>
-                                            <th scope="col">Категория</th>
-                                            <th scope="col">Изображение</th>
-                                            <th scope="col"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for dish in dishes %}
-                                            {% if dish.id_rest == restaurant.id %}
-                                                <tr>
-                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
-                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
-                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
-                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
-                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
-                                                    <td style="vertical-align: middle;">
-                                                        <form method="post">
-                                                            {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
-                                                            {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
-                                                            {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
-                                                        </form>
-                                                    </td>
-                                                </tr>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                                <div class="accordion" id="accordionAdminCategories">
+                                    {% for category in categories %}
+                                        {% if category.restaurant_id == restaurant.id %}
+                                            <div class="card">
+                                                <div class="card-header" id="headingAdminCategory{{category.id}}">
+                                                    <h5 class="mb-0">
+                                                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminCategory{{category.id}}" aria-expanded="false" aria-controls="collapseAdminCategory{{category.id}}">
+                                                            {{ category.name }}
+                                                        </button>
+                                                    </h5>
+                                                </div>
+                                            </div>
+                                            <div id="collapseAdminCategory{{category.id}}" class="collapse">
+                                                <table class="table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th scope="col">Название блюда</th>
+                                                            <th scope="col">Стоимость</th>
+                                                            <th scope="col">Описание</th>
+                                                            <th scope="col">Категория</th>
+                                                            <th scope="col">Изображение</th>
+                                                            <th scope="col"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for dish in dishes %}
+                                                            {% if dish.id_rest == restaurant.id and dish.category == category.name %}
+                                                                <tr>
+                                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
+                                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                    <td style="vertical-align: middle;">
+                                                                        <form method="post">
+                                                                            {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
+                                                                            {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
+                                                                            {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
+                                                                        </form>
+                                                                    </td>
+                                                                </tr>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
                                 <button id="btnRestEdit{{ restaurant.id }}" type="button">Изменить данные ресторана</button>
                                 <form id="restEdit{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
-                                    <table>
+                                    <table class="table">
                                         {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_edit_form_csrf") }}
                                         {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;", id="restaurant" + restaurant.id|string + "_edit_form_id_field") }}
                                         <tr>
@@ -218,25 +235,63 @@
                                 <td>{{ dish_form.img_file.label }}</td>
                                 <td>{{ dish_form.img_file }}</td>
                             </tr>
-                            <tr>
-                                <td>{{ dish_form.category.label }}</td>
-                                <td>{{ dish_form.category }}</td>
-                            </tr>
-                            <tr>
-                                {% if current_user.ownership != 'all' %}
-                                    {% if ns.rest_id != 0 %}
-                                        {{ dish_form.id_rest(value=ns.rest_id) }}
-                                    {% endif %}
-                                {% else %}
-                                    <td>{{ dish_form.id_rest.label }}</td>
-                                    <td>{{ dish_form.id_rest }}</td>
-                                {% endif %}
-                            </tr>
+                            {% if current_user.ownership != 'all' %}
+                                {{ dish_form.id_rest(value=ns.rest_id) }}
+                                <tr>
+                                    <td>{{ dish_form.category.label }}</td>
+                                    <td>
+                                        <select id="dish_add_category_selector" name="dish_add_category_selector" required>
+                                            <option selected disabled hidden></option>
+                                            {% for category in categories %}
+                                                {% if category.restaurant_id == ns.rest_id %}
+                                                    <option value="{{ category.name }}">{{ category.name }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                        {{ dish_form.category(hidden=True) }}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td>Укажите ресторан</td>
+                                    <td>
+                                        <select id="dish_add_rest_selector" name="dish_add_rest_selector" onchange="dishAddCategory();" required>
+                                            <option selected disabled hidden></option>
+                                            {% for restaurant in restaurants %}
+                                                <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {{ dish_form.id_rest(hidden=True) }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>{{ dish_form.category.label }}</td>
+                                    <td>
+                                        <select id="dish_add_admin_category_selector" name="dish_add_admin_category_selector" required>
+                                            <option selected disabled hidden></option>
+                                        </select>
+                                        {{ dish_form.category(hidden=True) }}
+                                    </td>
+                                </tr>
+                            {% endif %}
                             <tr>
                                 <td>{{ dish_form.dish_add_submit }}</td>
                             </tr>
                         </table>
                     </form>
+                    <script>
+                        function dishAddCategory() {
+                            let admin_category_select = document.getElementById('dish_add_admin_category_selector');
+                            let optionsHTMLCategory = '';
+                            var dish_rest_id = document.getElementById('dish_add_rest_selector').value;
+                            {% for category in categories %}
+                                if ( dish_rest_id == {{ category.restaurant_id|safe }} ) {
+                                    optionsHTMLCategory += '<option value="{{ category.name|safe }}">{{ category.name|safe }}</option>';
+                                }
+                            {% endfor %}
+                            admin_category_select.innerHTML = optionsHTMLCategory;
+                        }
+                    </script>
                 </div>
             </div>
         </div>
@@ -266,8 +321,16 @@
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td>{{ category_form.restaurant_id.label }}</td>
-                                    <td>{{ category_form.restaurant_id }}</td>
+                                    <td>Укажите ресторан</td>
+                                    <td>
+                                        <select id="category_add_rest_selector" name="category_add_rest_selector" required>
+                                            <option selected disabled hidden></option>
+                                            {% for restaurant in restaurants %}
+                                                <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {{ category_form.restaurant_id(hidden=true) }}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>{{ category_form.name.label }}</td>
@@ -293,26 +356,52 @@
             </div>
             <div id="collapseFour" class="collapse" aria-labelledby="headingFour" data-parent="#accordionExample">
                 <div class="card-body">
-                    <form action="" method="post">
+                    <form method="post">
                         {{ category_delete_form.csrf_token(id="category_delete_form_csrf") }}
                         <table class="table">
+                            {% if current_user.ownership != 'all' %}
                             <tr>
-                                <td>{{ category_delete_form.name.label }}</td>
                                 <td>
-                                    {{ category_delete_form.name(id="category_delete_name_field") }}
+                                    {{ category_delete_form.restaurant_id(value=ns.rest_id) }}
                                 </td>
                             </tr>
                             <tr>
-                                <tr>
-                                {% if ns.rest_id != 0 %}
-                                    <td>
-                                        {{ category_delete_form.restaurant_id(value=ns.rest_id) }}
-                                    </td>
-                                {% else %}
-                                    <td>{{ category_delete_form.restaurant_id.label }}</td>
-                                    <td>{{ category_delete_form.restaurant_id }}</td>
-                                {% endif %}
+                                <td>{{ category_delete_form.name.label }}</td>
+                                <td>
+                                    <select id="category_rest_delete_select_field" name="category_rest_delete_select_field" required>
+                                        <option selected disabled hidden></option>
+                                        {% for category in categories %}
+                                            {% if category.restaurant_id == ns.rest_id %}
+                                                <option value="{{ category.name|safe }}">{{ category.name|safe }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    {{ category_delete_form.name(id="category_delete_name_field", hidden=True) }}
+                                </td>
                             </tr>
+                            {% else %}
+                            <tr>
+                                <td>Укажите ресторан</td>
+                                <td>
+                                    <select id="category_del_rest_selector" name="category_del_rest_selector" onchange="showCategories();" required>
+                                        <option selected disabled hidden></option>
+                                        {% for restaurant in restaurants %}
+                                            <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {{ category_delete_form.restaurant_id(hidden=True) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>{{ category_delete_form.name.label }}</td>
+                                <td>
+                                    <select id="category_delete_select_field" name="category_delete_select_field" required>
+                                        <option selected disabled hidden></option>
+                                    </select>
+                                    {{ category_delete_form.name(id="category_delete_name_field", hidden=True) }}
+                                </td>
+                            </tr>
+                            {% endif %}
                             <tr>
                                 <td>{{ category_delete_form.category_delete_submit }}</td>
                             </tr>
@@ -320,6 +409,28 @@
                     </form>
                 </div>
             </div>
+            <script>
+                function showCategories() {
+                    let category_select = document.getElementById('category_delete_select_field');
+                    let optionHTML = '';
+                    if ({{ ns.rest_id|int }} != 0) {
+                        {% for category in categories %}
+                            {% if category.restaurant_id == ns.rest_id %}
+                                optionHTML += '<option value="{{ category.name|safe }}">{{ category.name|safe }}</option>';
+                            {% endif %}
+                        {% endfor %}
+                        category_select.innerHTML = optionHTML;
+                    } else {
+                        var rest_id = document.getElementById('category_del_rest_selector').value;
+                        {% for category in categories %}
+                            if ( rest_id == {{ category.restaurant_id|safe }} ) {
+                                optionHTML += '<option value="{{ category.name|safe }}">{{ category.name|safe }}</option>';
+                            }
+                        {% endfor %}
+                        category_select.innerHTML = optionHTML;
+                    }
+                }
+            </script>
         </div>
         {% if current_user.ownership != 'all' %}
             <div class="card">
@@ -530,7 +641,15 @@
                                 </tr>
                                 <tr>
                                     <td>{{ admin_add_form.ownership.label }}</td>
-                                    <td>{{ admin_add_form.ownership(size="50") }}</td>
+                                    <td>
+                                        <select id="admin_add_rest_selector" name="admin_add_rest_selector" required>
+                                            <option selected disabled hidden></option>
+                                            {% for restaurant in restaurants %}
+                                                <option value="{{ restaurant.name }}">{{ restaurant.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {{ admin_add_form.ownership(hidden=True) }}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>{{ admin_add_form.admin_add_button(class="btn btn-success") }}</td>
