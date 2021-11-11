@@ -45,41 +45,58 @@
                         </div>
                         <div id="collapse{{ restaurant.id }}" class="collapse" aria-labelledby="heading{{ restaurant.id }}" data-parent="#accordionRests">
                             <div class="card-body">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Название блюда</th>
-                                            <th scope="col">Стоимость</th>
-                                            <th scope="col">Описание</th>
-                                            <th scope="col">Категория</th>
-                                            <th scope="col">Изображение</th>
-                                            <th scope="col"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for dish in dishes %}
-                                            {% if dish.id_rest == restaurant.id %}
-                                                <tr>
-                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
-                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
-                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
-                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
-                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
-                                                    <td style="vertical-align: middle;">
-                                                        <form method="post">
-                                                            {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
-                                                            {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
-                                                            {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
-                                                        </form>
-                                                    </td>
-                                                </tr>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                                <div class="accordion" id="accordionAdminCategories">
+                                    {% for category in categories %}
+                                        {% if category.restaurant_id == restaurant.id %}
+                                            <div class="card">
+                                                <div class="card-header" id="headingAdminCategory{{category.id}}">
+                                                    <h5 class="mb-0">
+                                                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminCategory{{category.id}}" aria-expanded="false" aria-controls="collapseAdminCategory{{category.id}}">
+                                                            {{ category.name }}
+                                                        </button>
+                                                    </h5>
+                                                </div>
+                                            </div>
+                                            <div id="collapseAdminCategory{{category.id}}" class="collapse">
+                                                <table class="table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th scope="col">Название блюда</th>
+                                                            <th scope="col">Стоимость</th>
+                                                            <th scope="col">Описание</th>
+                                                            <th scope="col">Категория</th>
+                                                            <th scope="col">Изображение</th>
+                                                            <th scope="col"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for dish in dishes %}
+                                                            {% if dish.id_rest == restaurant.id and dish.category == category.name %}
+                                                                <tr>
+                                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
+                                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                    <td style="vertical-align: middle;">
+                                                                        <form method="post">
+                                                                            {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
+                                                                            {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
+                                                                            {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
+                                                                        </form>
+                                                                    </td>
+                                                                </tr>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
                                 <button id="btnRestEdit{{ restaurant.id }}" type="button">Изменить данные ресторана</button>
                                 <form id="restEdit{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
-                                    <table>
+                                    <table class="table">
                                         {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_edit_form_csrf") }}
                                         {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;", id="restaurant" + restaurant.id|string + "_edit_form_id_field") }}
                                         <tr>
