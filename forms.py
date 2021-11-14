@@ -73,7 +73,7 @@ class RestaurantDeleteForm(FlaskForm):
 
 class CategoryDeleteForm(FlaskForm):
     choices = [''] + [choice.name for choice in db.session.query(Category).all()]
-    name = SelectField("Название категории", choices=choices, validators=[DataRequired()])
+    name = SelectField("Название категории", choices=choices)
     restaurant_id = IntegerField("Идентификатор ресторана")
     category_delete_submit = SubmitField("Удалить")
 
