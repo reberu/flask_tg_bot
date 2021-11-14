@@ -1234,6 +1234,7 @@ def admin():
             composition = dish_form.composition.data
             if current_user.ownership == 'all':
                 id_rest = request.form['dish_add_rest_selector']
+                category = request.form['dish_add_admin_category_selector']
             else:
                 id_rest = dish_form.id_rest.data
                 category = request.form['dish_add_category_selector']
@@ -1294,23 +1295,17 @@ def admin():
 
     elif category_delete_form.category_delete_submit.data:
         if category_delete_form.validate_on_submit() or category_delete_form.is_submitted():
-            name = category_delete_form.name.data
+
             if current_user.ownership == 'all':
                 restaurant_id = request.form['category_del_rest_selector']
+                name = request.form['category_delete_select_field']
             else:
+                name = category_delete_form.name.data
                 restaurant_id = category_delete_form.restaurant_id.data
             db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
             db.session.commit()
             flash("Категория успешно удалена", "success")
             return redirect(url_for('admin'))
-
-    elif category_delete_form.is_submitted() and category_delete_form.category_delete_submit.data:
-        name = category_delete_form.name.data
-        restaurant_id = category_delete_form.restaurant_id.data
-        db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
-        db.session.commit()
-        flash("Категория успешно удалена", "success")
-        return redirect(url_for('admin'))
 
     elif restaurant_delete_form.validate_on_submit() and restaurant_delete_form.rest_delete_submit.data:
         name = restaurant_delete_form.name.data
@@ -1452,10 +1447,12 @@ def send_message(chat_id, text='bla-bla-bla'):
 
 
 def get_value(val, data):
-    for key, value in data.items():
-        if val == key:
-            return True
-    return False
+    try:
+        for key, value in data.items():
+            if val == key:
+                return True
+    except AttributeError:
+        return False
 
 
 def rest_menu_keyboard():
