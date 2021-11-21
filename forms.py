@@ -16,7 +16,7 @@ class LoginForm(FlaskForm):
 
 class DishForm(FlaskForm):
     name = StringField("Наименование", validators=[DataRequired()])
-    cost = IntegerField("Стоимость", validators=[DataRequired()])
+    cost = IntegerField("Стоимость", default=0)
     composition = StringField("Состав", validators=[DataRequired()])
     img_file = FileField("Загрузите изображение", validators=[DataRequired()])
     category = StringField("Категория")

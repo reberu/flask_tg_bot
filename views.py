@@ -456,27 +456,31 @@ def index():
                             if item.id == current_id:
                                 cart_dish_id = item.dish_id
                         dish = db.session.query(Dish).filter_by(id=cart_dish_id).first()
-
-                        text += f'<a href="{dish.img_link}">{rest}</a>\n'
-                        text += dish.name
-                        text += f'\n{dish.composition}'
-                        text += f'\n{dish.cost}'
-                        buttons.append(cart_buttons)
-                        buttons.append([
-                            InlineKeyboardButton('-',
-                                                 callback_data=f'cart_id_{current_id}_remove'),
-                            InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
-                            InlineKeyboardButton('+',
-                                                 callback_data=f'cart_id_{current_id}_add')
-                        ])
-                        buttons.append([
-                            InlineKeyboardButton('Очистить️',
-                                                 callback_data=f'cart_purge'),
-                            InlineKeyboardButton('Меню️',
-                                                 callback_data=f'restaurant_{cart[0].restaurant_id}')
-                        ])
-                        buttons.append([InlineKeyboardButton(f'Оформить заказ на сумму {total}',
-                                                             callback_data='cart_confirm')])
+                        if dish is not None:
+                            text += f'<a href="{dish.img_link}">{rest}</a>\n'
+                            text += dish.name
+                            text += f'\n{dish.composition}'
+                            text += f'\n{dish.cost}'
+                            buttons.append(cart_buttons)
+                            buttons.append([
+                                InlineKeyboardButton('-',
+                                                     callback_data=f'cart_id_{current_id}_remove'),
+                                InlineKeyboardButton(f'{cart_count} шт', callback_data='None'),
+                                InlineKeyboardButton('+',
+                                                     callback_data=f'cart_id_{current_id}_add')
+                            ])
+                            buttons.append([
+                                InlineKeyboardButton('Очистить️',
+                                                     callback_data=f'cart_purge'),
+                                InlineKeyboardButton('Меню️',
+                                                     callback_data=f'restaurant_{cart[0].restaurant_id}')
+                            ])
+                            buttons.append([InlineKeyboardButton(f'Оформить заказ на сумму {total}',
+                                                                 callback_data='cart_confirm')])
+                        else:
+                            text = 'Произошла ошибка, попробуйте еще раз'
+                            cb_data = f'restaurant_{cart[0].restaurant_id}'
+                            buttons = [InlineKeyboardButton('Меню️', callback_data=cb_data)]
                         if re.search('^cart$', data):
                             BOT.sendMessage(
                                 text=text,
@@ -1164,6 +1168,8 @@ def index():
                             print('TypeError')
                             print("We can't handle this message", message)
                 except telegram.error.Unauthorized:
+                    pass
+                except TypeError:
                     pass
                 finally:
                     print('Final processing')
