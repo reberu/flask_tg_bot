@@ -10,7 +10,7 @@ from telegram import error
 
 from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
     RestaurantDeleteForm, RestaurantEditForm, AdminAddForm, RestaurantDeliveryTermsForm, RestaurantDeliveryTermsEditForm
-from settings import BOT_TOKEN, BASE_URL
+from settings import BOT_TOKEN, BASE_URL, RULES
 
 import re
 import requests
@@ -1020,6 +1020,8 @@ def index():
                             )
                     elif parse_text(message) == '/show_contract':
                         BOT.send_message(chat_id, 'Ссылка на договор')
+                    elif parse_text(message) == '/rules':
+                        BOT.send_message(chat_id, RULES)
 
                     elif parse_text(message) == 'Оформить заказ':
                         BOT.send_message(chat_id, 'Вы выбрали оформить заказ')
@@ -1165,8 +1167,9 @@ def index():
                                     reply_markup=InlineKeyboardMarkup(buttons)
                                 )
                         except TypeError:
-                            print('TypeError')
-                            print("We can't handle this message", message)
+                            text = 'Бот только учится разговаривать, он пока не умеет общаться, ' \
+                                   'поэтому просим использовать кнопки😊'
+                            BOT.send_message(chat_id=chat_id, text=text)
                 except telegram.error.Unauthorized:
                     pass
                 except TypeError:
