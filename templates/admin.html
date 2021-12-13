@@ -2,11 +2,13 @@
 {% block script %}
 <script>
     $(document).ready(function() {
-        for (let i = 1; i < {{ restaurants|length }} + 1; i++) {
-            $("#btnRestEdit" + i).click(function(){
-                $("#restEdit" + i).toggle();
+
+        {% for restaurant in restaurants %}
+            $("#btnRestEdit" + {{ restaurant.id }}).click(function(){
+                $("#restEdit" + {{ restaurant.id }}).toggle();
             });
-        }
+        {% endfor %}
+
         for (let j = 1; j < 8; j++) {
             $("#btnStat" + j).click(function(){
                 $(".stat" + j).toggle();
@@ -20,7 +22,7 @@
 {% endblock %}
 
 {% block content %}
-    {% set ns = namespace (rest_id = 0) %}
+    {% set ns = namespace (rest_id = 0, condition = False) %}
 <h2 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">Личный кабинет</h2>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -446,6 +448,7 @@
                         <p>Можете внести изменения в любое поле</p>
                         {% for term in delivery_terms %}
                             {% if term.rest_id == ns.rest_id %}
+                                {% set ns.condition = True %}
                                 <!--Here we need to show edit form-->
                                 <form method="post" enctype="multipart/form-data">
                                     {{ rest_delivery_terms_edit_form.csrf_token(id="rest_delivery_form_csrf") }}
@@ -476,38 +479,40 @@
                                         </tr>
                                     </table>
                                 </form>
-                            {% else %}
-                                <form method="post" enctype="multipart/form-data">
-                                    {{ rest_delivery_terms_form.csrf_token() }}
-                                    <table class="table">
-                                        {{ rest_delivery_terms_form.rest_id(value=ns.rest_id) }}
-                                        <tr>
-                                            <td>{{ rest_delivery_terms_form.terms.label }}</td>
-                                            <td>{{ rest_delivery_terms_form.terms }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>{{ rest_delivery_terms_form.rest_inn.label }}</td>
-                                            <td>{{ rest_delivery_terms_form.rest_inn }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>{{ rest_delivery_terms_form.rest_ogrn.label }}</td>
-                                            <td>{{ rest_delivery_terms_form.rest_ogrn }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>{{ rest_delivery_terms_form.rest_fullname.label }}</td>
-                                            <td>{{ rest_delivery_terms_form.rest_fullname(id="rest" + ns.rest_id|string + "_delivery_terms_fullname_field") }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>{{ rest_delivery_terms_form.rest_address.label }}</td>
-                                            <td>{{ rest_delivery_terms_form.rest_address }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>{{ rest_delivery_terms_form.delivery_terms_submit }}</td>
-                                        </tr>
-                                    </table>
-                                </form>
                             {% endif %}
                         {% endfor %}
+                        {% if not ns.condition %}
+                            <script>console.log("ns.rest_id not in terms");</script>
+                            <form method="post" enctype="multipart/form-data">
+                                {{ rest_delivery_terms_form.csrf_token() }}
+                                <table class="table">
+                                    {{ rest_delivery_terms_form.rest_id(value=ns.rest_id) }}
+                                    <tr>
+                                        <td>{{ rest_delivery_terms_form.terms.label }}</td>
+                                        <td>{{ rest_delivery_terms_form.terms }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ rest_delivery_terms_form.rest_inn.label }}</td>
+                                        <td>{{ rest_delivery_terms_form.rest_inn }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ rest_delivery_terms_form.rest_ogrn.label }}</td>
+                                        <td>{{ rest_delivery_terms_form.rest_ogrn }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ rest_delivery_terms_form.rest_fullname.label }}</td>
+                                        <td>{{ rest_delivery_terms_form.rest_fullname(id="rest" + ns.rest_id|string + "_delivery_terms_fullname_field") }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ rest_delivery_terms_form.rest_address.label }}</td>
+                                        <td>{{ rest_delivery_terms_form.rest_address }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ rest_delivery_terms_form.delivery_terms_submit }}</td>
+                                    </tr>
+                                </table>
+                            </form>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -570,7 +575,15 @@
                             <table class="table">
                                 <tr>
                                     <td>{{ restaurant_delete_form.name.label }}</td>
-                                    <td>{{ restaurant_delete_form.name(id="rest_delete_name_field") }}</td>
+                                    <!--<td>{{ restaurant_delete_form.name(id="rest_delete_name_field") }}</td>-->
+                                    <td>
+                                        <select id="rest_delete_name_field" name="rest_delete_select_field" required>
+                                            <option selected disabled hidden></option>
+                                            {% for restaurant in restaurants %}
+                                                <option value="{{ restaurant.name|safe }}">{{ restaurant.name|safe }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>{{ restaurant_delete_form.rest_delete_submit }}</td>

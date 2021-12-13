@@ -5,5 +5,9 @@
 {% endblock %}
 
 {% block content %}
-Текст договора
+
+    {% for line in contract_text.splitlines() %}
+        <p align="justify">{{line}}</p>
+    {% endfor %}
+
 {% endblock %}
