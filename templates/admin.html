@@ -1,15 +1,60 @@
 {% extends 'base.html' %}
 {% block script %}
 <script>
-    $(document).ready(function() {
+    $( document ).ready(function() {
+        $("#btnAddCombo").click(function(){
+            $("#comboAddForm").toggle();
+        });
+
+        $("#btnAddPromo").click(function(){
+            $("#promoDishAddForm").toggle();
+        });
+
+        $("#btnAddPromoRest").click(function(){
+            $("#promoDishAddFormRest").toggle();
+        });
+
+        $("#btnAddSubcategory").click(function(){
+            $("#subCatAddForm").toggle();
+        });
+
+        $("#btnAddSubcategoryDish").click(function(){
+            $("#subDishAddForm").toggle();
+        });
+
+        $("#btnDelSubcategory").click(function(){
+            $("#subCatDelForm").toggle();
+        });
 
         {% for restaurant in restaurants %}
             $("#btnRestEdit" + {{ restaurant.id }}).click(function(){
                 $("#restEdit" + {{ restaurant.id }}).toggle();
             });
+            $("#btnRestDisable" + {{ restaurant.id }}).click(function(){
+                $("#restDisable" + {{ restaurant.id }}).toggle();
+            });
         {% endfor %}
 
-        for (let j = 1; j < 8; j++) {
+        {% for dish in dishes %}
+            $("#btnDishEdit" + {{dish.id}}).click(function(){
+                $(".dishEditForm" + {{dish.id}}).toggle();
+                if($("#btnDishEdit" + {{dish.id}}).html() == "Скрыть"){
+                    $("#btnDishEdit" + {{dish.id}}).html("Изменить");
+                } else {
+                    $("#btnDishEdit" + {{dish.id}}).html("Скрыть");
+                }
+            });
+            $("#btnDishEditRest" + {{dish.id}}).click(function(){
+                $(".dishEditRestForm" + {{dish.id}}).toggle();
+                if($("#btnDishEditRest" + {{dish.id}}).html() == "Скрыть"){
+                    $("#btnDishEditRest" + {{dish.id}}).html("Изменить");
+                } else {
+                    $("#btnDishEditRest" + {{dish.id}}).html("Скрыть");
+                }
+            });
+        {% endfor %}
+
+        for (let j = 1; j < 9; j++) {
             $("#btnStat" + j).click(function(){
                 $(".stat" + j).toggle();
             });
@@ -35,9 +80,384 @@
         {% endwith %}
         {% if current_user.ownership == 'all' %}
             <ul>Вы администратор всех ресторанов</ul>
-            {% for restaurant in restaurants %}
                 <div class="accordion" id="accordionRests">
                     <div class="card">
+                    {% for restaurant in restaurants %}
+                        {% if restaurant.id == 1 %}
+                        <div class="card-header" id="headingAdmin">
+                            <h5 class="mb-0">
+                                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdmin" aria-expanded="false" aria-controls="collapseAdmin">
+                                    {{ restaurant.name }}
+                                </button>
+                            </h5>
+                        </div>
+                        <div id="collapseAdmin" class="collapse" aria-labelledby="headingAdmin" data-parent="#accordionRests">
+                            <div class="card-body">
+                                <div class="accordion" id="accordionAdminCat">
+                                    {% for category in categories %}
+                                        {% if category.restaurant_id == restaurant.id %}
+                                            <div class="card">
+                                                <div class="card-header" id="headingAdminCat{{category.id}}">
+                                                    <h5 class="mb-0">
+                                                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminCat{{category.id}}" aria-expanded="false" aria-controls="collapseAdminCat{{category.id}}">
+                                                            {{ category.name }}
+                                                        </button>
+                                                    </h5>
+                                                </div>
+                                            </div>
+                                            <div id="collapseAdminCat{{category.id}}" class="collapse">
+                                                {% if category.name == "Рекомендуем" %}
+                                                {% for subcategory in subcategories %}
+                                                    {% if subcategory.category_id == category.id %}
+                                                        <div class="accordion" id="accordionAdminSubcat">
+                                                            <div class="card">
+                                                                <div class="card-header" id="headingAdminSubcat{{subcategory.id}}">
+                                                                    <h5 class="mb-0">
+                                                                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminSubcat{{subcategory.id}}" aria-expanded="false" aria-controls="collapseAdminSubcat{{subcategory.id}}">
+                                                                            {{ subcategory.name }}
+                                                                        </button>
+                                                                    </h5>
+                                                                </div>
+                                                            </div>
+                                                            <div id="collapseAdminSubcat{{subcategory.id}}" class="collapse">
+                                                                <table class="table">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th scope="col">Название блюда</th>
+                                                                            <th scope="col">Стоимость</th>
+                                                                            <th scope="col">Описание</th>
+                                                                            <th scope="col">Категория</th>
+                                                                            <th scope="col">Изображение</th>
+                                                                            <th scope="col"></th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                    {% for s_dish in s_dishes %}
+                                                                        {% if subcategory.id == s_dish.subcat_id %}
+                                                                        {% for dish in dishes %}
+                                                                            {% if dish.id == s_dish.dish_id %}
+                                                                            <tr>
+                                                                                <td style="vertical-align: middle;">{{ dish.name }}</td>
+                                                                                <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
+                                                                                <td style="vertical-align: middle;">{{ dish.composition }}</td>
+                                                                                <td style="vertical-align: middle;">{{ dish.category }}</td>
+                                                                                <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                                <td style="vertical-align: middle;">
+                                                                                    <form method="post">
+                                                                                        {{ special_dish_delete_form.csrf_token(id="special_dish" + dish.id|string + "_delete_form_csrf") }}
+                                                                                        {{ special_dish_delete_form.special_dish_id(hidden=True, value=s_dish.id, id="special_dish_" + dish.id|string + "_delete_id") }}
+                                                                                        {{ special_dish_delete_form.special_dish_delete_submit(class="btn btn-danger", id="special_dish_" + s_dish.id|string + "_delete_submit_field") }}
+                                                                                    </form>
+                                                                                </td>
+                                                                            </tr>
+                                                                            {% endif %}
+                                                                        {% endfor %}
+                                                                        {% endif %}
+                                                                    {% endfor %}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                <button id="btnAddSubcategoryDish" type="button">Добавить блюдо</button>
+                                                <form id="subDishAddForm" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data">
+                                                    {{ special_dish_form.csrf_token() }}
+                                                    <table class="table">
+                                                        <tr>
+                                                            <td>{{ special_dish_form.rest_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.rest_id(hidden=true) }}
+                                                                <select id="s_dish_rest_selector" name="s_dish_rest_selector" onchange="sDishAddCategory();" required>
+                                                                    <option selected disabled></option>
+                                                                    {% for restaurant in restaurants %}
+                                                                        <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ special_dish_form.category_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.category_id(hidden=true) }}
+                                                                <select id="s_dish_cat_selector" name="s_dish_cat_selector" required>
+                                                                    <option selected disabled></option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ special_dish_form.dish_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.dish_id(hidden=true) }}
+                                                                <select id="s_dish_selector" name="s_dish_selector" required>
+                                                                    <option selected disabled></option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ special_dish_form.subcat_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.subcat_id(hidden=true) }}
+                                                                <select id="s_dish_subcat_selector" name="s_dish_subcat_selector" required>
+                                                                    <option selected disabled></option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ special_dish_form.s_dish_add_submit(class="btn btn-warning") }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </form>
+                                                <script>
+                                                    function sDishAddCategory() {
+                                                        let s_dish_category_select = document.getElementById('s_dish_cat_selector');
+                                                        let optionsHTMLCategory = '';
+                                                        var s_dish_rest_id = document.getElementById('s_dish_rest_selector').value;
+                                                        {% for category in categories %}
+                                                            if ( s_dish_rest_id == {{ category.restaurant_id|safe }} ) {
+                                                                optionsHTMLCategory += '<option value="{{ category.id|safe }}">{{ category.name|safe }}</option>';
+                                                            }
+                                                        {% endfor %}
+                                                        s_dish_category_select.innerHTML = optionsHTMLCategory;
+                                                        $('#s_dish_cat_selector').on('change', function() {
+                                                            let s_dish_select = document.getElementById('s_dish_selector');
+                                                            let optionsHTMLDishes = '';
+                                                            let s_dish_rest_id = $("#s_dish_rest_selector").val();
+                                                            let s_dish_cat_text = $("#s_dish_cat_selector option:selected").text();
+                                                            {% for dish in dishes %}
+                                                                if (s_dish_rest_id == Number('{{ dish.id_rest }}') && s_dish_cat_text == '{{ dish.category }}') {
+                                                                    optionsHTMLDishes += '<option value="{{ dish.id|safe }}">{{ dish.name|safe }}</option>';
+                                                                }
+                                                            {% endfor %}
+                                                            s_dish_select.innerHTML = optionsHTMLDishes;
+                                                        });
+                                                        let s_dish_subcat_select = document.getElementById('s_dish_subcat_selector');
+                                                        let optionsHTMLSubcat = '';
+                                                        {% for subcategory in subcategories %}
+                                                            optionsHTMLSubcat += '<option value="{{ subcategory.id|safe }}">{{ subcategory.name|safe }}</option>';
+                                                        {% endfor %}
+                                                        s_dish_subcat_select.innerHTML = optionsHTMLSubcat;
+                                                    };
+                                                </script>
+                                                <div style="margin-bottom:10px"></div>
+                                                <button id="btnAddSubcategory" type="button">Добавить подкатегорию</button>
+                                                <form id="subCatAddForm" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                                    {{ subcategory_add_form.csrf_token() }}
+                                                    <table class="table">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td>{{ subcategory_add_form.name.label }}</td>
+                                                                <td>{{ subcategory_add_form.name }}</td>
+                                                            </tr>
+                                                            {{ subcategory_add_form.category_id(value=category.id, hidden=true) }}
+                                                            <tr>
+                                                                <td>{{ subcategory_add_form.subcategory_add_submit(class="btn btn-warning") }}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </form>
+                                                <div style="margin-bottom:10px"></div>
+                                                <button id="btnDelSubcategory" type="button">Удалить подкатегорию</button>
+                                                <form id="subCatDelForm" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                                    {{ subcategory_del_form.csrf_token() }}
+                                                    <table class="table">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td>Подкатегория</td>
+                                                                <td>
+                                                                    {{ subcategory_del_form.subcategory_id(hidden=true) }}
+                                                                    <select id="subcat_del_selector" name="subcat_del_selector" required>
+                                                                        <option selected disabled></option>
+                                                                    </select>
+                                                                </td>
+                                                                <td>{{ subcategory_del_form.subcategory_del_submit(class="btn btn-warning") }}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </form>
+                                                <script>
+                                                    let subcategory_select = document.getElementById('subcat_del_selector');
+                                                    let optionsHTMLCategory = '';
+                                                    {% for subcategory in subcategories %}
+                                                            optionsHTMLCategory += '<option value="{{ subcategory.id|safe }}">{{ subcategory.name|safe }}</option>';
+                                                    {% endfor %}
+                                                    subcategory_select.innerHTML = optionsHTMLCategory;
+                                                </script>
+                                                <div style="margin-bottom:10px"></div>
+                                                {% elif category.name == "Комбо Наборы" %}
+                                                <table class="table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th scope="col">Название блюда</th>
+                                                            <th scope="col">Стоимость</th>
+                                                            <th scope="col">Описание</th>
+                                                            <th scope="col">Категория</th>
+                                                            <th scope="col">Изображение</th>
+                                                            <th scope="col"></th>
+                                                            <th></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    {% for s_dish in s_dishes %}
+                                                        {% if s_dish.subcat_id == -1 %}
+                                                            {% for dish in dishes %}
+                                                                {% if dish.id == s_dish.dish_id %}
+                                                                <tr>
+                                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
+                                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
+                                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                    <td style="vertical-align: middle;">
+                                                                        <form method="post">
+                                                                            {{ special_dish_delete_form.csrf_token(id="special_dish" + dish.id|string + "_delete_form_csrf") }}
+                                                                            {{ special_dish_delete_form.special_dish_id(hidden=True, value=s_dish.id, id="special_dish_" + dish.id|string + "_delete_id") }}
+                                                                            {{ special_dish_delete_form.special_dish_delete_submit(class="btn btn-danger", id="special_dish_" + s_dish.id|string + "_delete_submit_field") }}
+                                                                        </form>
+                                                                    </td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                                <button id="btnAddCombo" type="button">Добавить КБ</button>
+                                                <form id="comboAddForm" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data">
+                                                    {{ special_dish_form.csrf_token() }}
+                                                    <table class="table">
+                                                        <tr>
+                                                            <td>{{ special_dish_form.rest_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.rest_id(hidden=true) }}
+                                                                <select id="combo_rest_selector" name="combo_rest_selector" onchange="comboAddFunc();" required>
+                                                                    <option selected disabled></option>
+                                                                    {% for restaurant in restaurants %}
+                                                                        <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ special_dish_form.category_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.category_id(hidden=true) }}
+                                                                <select id="combo_cat_selector" name="combo_cat_selector" required>
+                                                                    <option selected disabled></option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ special_dish_form.dish_id.label }}</td>
+                                                            <td>
+                                                                {{ special_dish_form.dish_id(hidden=true) }}
+                                                                <select id="combo_selector" name="combo_selector" required>
+                                                                    <option selected disabled></option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>
+                                                                {{ special_dish_form.subcat_id(hidden=true, value=-1) }}
+                                                                {{ special_dish_form.s_dish_add_submit(class="btn btn-warning") }}
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </form>
+                                                <script>
+                                                    function comboAddFunc() {
+                                                        let combo_category_select = document.getElementById('combo_cat_selector');
+                                                        let optionsHTMLCategory = '';
+                                                        var combo_rest_id = document.getElementById('combo_rest_selector').value;
+                                                        {% for category in categories %}
+                                                            if ( combo_rest_id == {{ category.restaurant_id|safe }} ) {
+                                                                optionsHTMLCategory += '<option value="{{ category.id|safe }}">{{ category.name|safe }}</option>';
+                                                            }
+                                                        {% endfor %}
+                                                        combo_category_select.innerHTML = optionsHTMLCategory;
+                                                        $('#combo_cat_selector').on('change', function() {
+                                                            let combo_select = document.getElementById('combo_selector');
+                                                            let optionsHTMLDishes = '';
+                                                            let combo_rest_id = $("#combo_rest_selector").val();
+                                                            let combo_cat_text = $("#combo_cat_selector option:selected").text();
+                                                            {% for dish in dishes %}
+                                                                if (combo_rest_id == Number('{{ dish.id_rest }}') && combo_cat_text == '{{ dish.category }}') {
+                                                                    optionsHTMLDishes += '<option value="{{ dish.id|safe }}">{{ dish.name|safe }}</option>';
+                                                                }
+                                                            {% endfor %}
+                                                            combo_select.innerHTML = optionsHTMLDishes;
+                                                        });
+                                                    };
+                                                </script>
+                                                <div style="margin-bottom:10px"></div>
+                                                {% elif category.name == "Акции" %}
+                                                <table class="table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th scope="col">Ресторан</th>
+                                                            <th scope="col">Изображение</th>
+                                                            <th scope="col"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    {% for promo_dish in promo_dishes %}
+                                                        <tr>
+                                                            <td style="vertical-align: middle;">
+                                                                {% for restaurant in restaurants %}
+                                                                    {% if restaurant.id == promo_dish.rest_id %}
+                                                                        {{ restaurant.name }}
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            </td>
+                                                            <td style="vertical-align: middle;"><img src="{{ promo_dish.img_link }}" height=100 width=100 align="center"></td>
+                                                            <td>
+                                                                <form id="promoDishDeleteForm" method="post" enctype="multipart/form-data">
+                                                                    {{ promo_dishes_delete_form.csrf_token() }}
+                                                                    {{ promo_dishes_delete_form.promo_dish_id(value=promo_dish.id, hidden=true) }}
+                                                                    {{ promo_dishes_delete_form.promo_dish_delete_submit(class="btn btn-danger") }}
+                                                                </form>
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                                <button id="btnAddPromo" type="button">Добавить акцию</button>
+                                                <form id="promoDishAddForm" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data">
+                                                    {{ promo_dishes_form.csrf_token() }}
+                                                    <table class="table">
+                                                        {{ promo_dishes_form.rest_id(hidden=true, value=ns.rest_id) }}
+                                                        {{ promo_dishes_form.selected(hidden=true, value=False) }}
+                                                        <tr>
+                                                            <td>{{ promo_dishes_form.rest_id.label }}</td>
+                                                            <td>
+                                                                <select id="promo_rest_selector" name="promo_rest_selector" onchange="promoRestSelFunc();" required>
+                                                                    <option selected disabled></option>
+                                                                    {% for restaurant in restaurants %}
+                                                                        <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>{{ promo_dishes_form.img_file.label }}</td>
+                                                            <td>{{ promo_dishes_form.img_file }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>
+                                                                {{ promo_dishes_form.promo_dish_submit(class="btn btn-warning") }}
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </form>
+                                                <div style="margin-bottom:10px"></div>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
                         <div class="card-header" id="heading{{ restaurant.id }}">
                             <h5 class="mb-0">
                                 <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapse{{ restaurant.id }}" aria-expanded="false" aria-controls="collapse{{ restaurant.id }}">
@@ -50,49 +470,79 @@
                                 <div class="accordion" id="accordionAdminCategories">
                                     {% for category in categories %}
                                         {% if category.restaurant_id == restaurant.id %}
-                                            <div class="card">
-                                                <div class="card-header" id="headingAdminCategory{{category.id}}">
-                                                    <h5 class="mb-0">
-                                                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminCategory{{category.id}}" aria-expanded="false" aria-controls="collapseAdminCategory{{category.id}}">
-                                                            {{ category.name }}
-                                                        </button>
-                                                    </h5>
-                                                </div>
+                                        <div class="card">
+                                            <div class="card-header" id="headingAdminCategory{{category.id}}">
+                                                <h5 class="mb-0">
+                                                    <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminCategory{{category.id}}" aria-expanded="false" aria-controls="collapseAdminCategory{{category.id}}">
+                                                        {{ category.name }}
+                                                    </button>
+                                                </h5>
                                             </div>
-                                            <div id="collapseAdminCategory{{category.id}}" class="collapse">
-                                                <table class="table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th scope="col">Название блюда</th>
-                                                            <th scope="col">Стоимость</th>
-                                                            <th scope="col">Описание</th>
-                                                            <th scope="col">Категория</th>
-                                                            <th scope="col">Изображение</th>
-                                                            <th scope="col"></th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for dish in dishes %}
-                                                            {% if dish.id_rest == restaurant.id and dish.category == category.name %}
-                                                                <tr>
-                                                                    <td style="vertical-align: middle;">{{ dish.name }}</td>
-                                                                    <td style="vertical-align: middle;">{{ dish.cost }} р.</td>
-                                                                    <td style="vertical-align: middle;">{{ dish.composition }}</td>
-                                                                    <td style="vertical-align: middle;">{{ dish.category }}</td>
-                                                                    <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
-                                                                    <td style="vertical-align: middle;">
-                                                                        <form method="post">
-                                                                            {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
-                                                                            {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
-                                                                            {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
-                                                                        </form>
-                                                                    </td>
+                                        </div>
+                                        <div id="collapseAdminCategory{{category.id}}" class="collapse">
+                                            <table class="table">
+                                                <thead>
+                                                    <tr>
+                                                        <th scope="col">Название блюда</th>
+                                                        <th scope="col">Стоимость</th>
+                                                        <th scope="col">Описание</th>
+                                                        <th scope="col">Категория</th>
+                                                        <th scope="col">Изображение</th>
+                                                        <th scope="col"></th>
+                                                        <th scope="col"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for dish in dishes %}
+                                                        {% if dish.id_rest == restaurant.id and dish.category == category.name %}
+                                                            <tr>
+                                                                <td style="vertical-align: middle;" class="dishEdit">{{ dish.name }}</td>
+                                                                <td style="vertical-align: middle;" class="dishEdit">{{ dish.cost }} р.</td>
+                                                                <td style="vertical-align: middle;" class="dishEdit">{{ dish.composition }}</td>
+                                                                <td style="vertical-align: middle;" class="dishEdit">{{ dish.category }}</td>
+                                                                <td style="vertical-align: middle;" class="dishEdit"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                <td style="vertical-align: middle;" class="dishEdit"><button id="btnDishEdit{{ dish.id }}" type="button" class="btn btn-warning">Изменить</button></td>
+                                                                <td style="vertical-align: middle;" class="dishEdit">
+                                                                    <form method="post">
+                                                                        {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
+                                                                        {{ dish_delete_form.delete_id(value=dish.id, id="dish" + dish.id|string + "_delete_id") }}
+                                                                        {{ dish_delete_form.dish_delete_submit(class="btn btn-danger", id="dish" + dish.id|string + "_delete_submit_field") }}
+                                                                    </form>
+                                                                </td>
+                                                            </tr>
+                                                            <form style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                                                {{ dish_edit_form.csrf_token(id="dish_" + dish.id|string + "_edit_form_csrf") }}
+                                                                {{ dish_edit_form.id_rest(value=dish.id_rest, style="display:none;") }}
+                                                                {{ dish_edit_form.id_dish(value=dish.id, style="display:none;") }}
+                                                                <tr class="dishEditForm{{ dish.id }}" style="display:none;">
+                                                                    <td>{{ dish_edit_form.name.label }}</td>
+                                                                    <td colspan="6">{{ dish_edit_form.name(value=dish.name, size="50") }}</td>
                                                                 </tr>
-                                                            {% endif %}
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                                <tr class="dishEditForm{{ dish.id }}" style="display:none;">
+                                                                    <td>{{ dish_edit_form.cost.label }}</td>
+                                                                    <td colspan="6">{{ dish_edit_form.cost(value=dish.cost, size="50") }}</td>
+                                                                </tr>
+                                                                <tr class="dishEditForm{{ dish.id }}" style="display:none;">
+                                                                    <td>{{ dish_edit_form.composition.label }}</td>
+                                                                    <td colspan="6">{{ dish_edit_form.composition(value=dish.composition, size="50") }}</td>
+                                                                </tr>
+                                                                <tr class="dishEditForm{{ dish.id }}" style="display:none;">
+                                                                    <td>{{ dish_edit_form.category.label }}</td>
+                                                                    <td colspan="6">{{ dish_edit_form.category(value=dish.category, size="50") }}</td>
+                                                                </tr>
+                                                                <tr class="dishEditForm{{ dish.id }}" style="display:none;">
+                                                                    <td>{{ dish_edit_form.img_file.label }}</td>
+                                                                    <td colspan="6">{{ dish_edit_form.img_file }}</td>
+                                                                </tr>
+                                                                <tr class="dishEditForm{{ dish.id }}" style="display:none;">
+                                                                    <td>{{ dish_edit_form.dish_edit_submit(class="btn btn-warning", id="dish_" + dish.id|string + "_edit_submit_button") }}</td>
+                                                                </tr>
+                                                            </form>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                         {% endif %}
                                     {% endfor %}
                                 </div>
@@ -101,32 +551,66 @@
                                     <table class="table">
                                         {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_edit_form_csrf") }}
                                         {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;", id="restaurant" + restaurant.id|string + "_edit_form_id_field") }}
+                                        {{ restaurant_edit_form.enabled(value=restaurant.enabled, style="display:none;") }}
                                         <tr>
                                             <td>{{ restaurant_edit_form.name.label }}</td>
-                                            <td>{{ restaurant_edit_form.name(size="50", id="rest" + restaurant.id|string + "_name_field") }}</td>
+                                            <td>{{ restaurant_edit_form.name(value=restaurant.name, size="50", id="rest" + restaurant.id|string + "_name_field") }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.address.label }}</td>
-                                            <td>{{ restaurant_edit_form.address(size="50", id="rest" + restaurant.id|string + "_address_field") }}</td>
+                                            <td>{{ restaurant_edit_form.address(value=restaurant.address, size="50", id="rest" + restaurant.id|string + "_address_field") }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.contact.label }}</td>
-                                            <td>{{ restaurant_edit_form.contact(size="50", id="rest" + restaurant.id|string + "_contact_field") }}</td>
+                                            <td>{{ restaurant_edit_form.contact(value=restaurant.contact, size="50", id="rest" + restaurant.id|string + "_contact_field") }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.passwd.label }}</td>
-                                            <td>{{ restaurant_edit_form.passwd(size="50", id="rest" + restaurant.id|string + "_passwd_field") }}</td>
+                                            <td>{{ restaurant_edit_form.passwd(value=restaurant.passwd, size="50", id="rest" + restaurant.id|string + "_passwd_field") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.email.label }}</td>
+                                            <td>{{ restaurant_edit_form.email(value=restaurant.email, size="50", id="email" + restaurant.id|string + "_email_field") }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.min_total.label }}</td>
+                                            <td>{{ restaurant_edit_form.min_total(value=restaurant.min_total, id="min_total_rest" + restaurant.id|string) }}</td>
                                         </tr>
                                         <tr>
                                             <td>{{ restaurant_edit_form.rest_edit_submit(class="btn btn-warning", id="restaurant" + restaurant.id|string + "_edit_submit_field") }}</td>
                                         </tr>
                                     </table>
                                 </form>
+                                <button id="btnRestDisable{{ restaurant.id }}" type="button">Статус</button>
+                                <form id="restDisable{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                    <table class="table">
+                                        {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_toggle_form_csrf") }}
+                                        {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;") }}
+                                        {% if restaurant.enabled == True %}
+                                        {{ restaurant_edit_form.enabled(value=false, style="display:none;") }}
+                                        <tr>
+                                            <label>Включен</label>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Выключить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_disable_submit_field") }}</td>
+                                        </tr>
+                                        {% elif restaurant.enabled == False %}
+                                        {{ restaurant_edit_form.enabled(value=1, style="display:none;") }}
+                                        <tr>
+                                            <label>Выключен</label>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Включить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_enable_submit_field") }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </table>
+                                </form>
                             </div>
                         </div>
+                        {% endif %}
+                        {% endfor %}
                     </div>
                 </div>
-            {% endfor %}
         {% else %}
             {% for restaurant in restaurants %}
                 {% if restaurant.name == current_user.ownership %}
@@ -169,6 +653,7 @@
                                                                         <th scope="col">Категория</th>
                                                                         <th scope="col">Изображение</th>
                                                                         <th scope="col"></th>
+                                                                        <th scope="col"></th>
                                                                     </tr>
                                                                 </thead>
                                                             {% for dish in dishes %}
@@ -180,6 +665,7 @@
                                                                             <td style="vertical-align: middle;">{{ dish.composition }}</td>
                                                                             <td style="vertical-align: middle;">{{ dish.category }}</td>
                                                                             <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
+                                                                            <td style="vertical-align: middle;" class="dishEditRest"><button id="btnDishEditRest{{ dish.id }}" type="button" class="btn btn-warning">Изменить</button></td>
                                                                             <td style="vertical-align: middle;">
                                                                                 <form method="post">
                                                                                     {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
@@ -188,6 +674,34 @@
                                                                                 </form>
                                                                             </td>
                                                                         </tr>
+                                                                        <form style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                                                            {{ dish_edit_form.csrf_token(id="dish_" + dish.id|string + "_edit_rest_form_csrf") }}
+                                                                            {{ dish_edit_form.id_rest(value=dish.id_rest, style="display:none;") }}
+                                                                            {{ dish_edit_form.id_dish(value=dish.id, style="display:none;") }}
+                                                                            <tr class="dishEditRestForm{{ dish.id }}" style="display:none;">
+                                                                                <td>{{ dish_edit_form.name.label }}</td>
+                                                                                <td colspan="6">{{ dish_edit_form.name(value=dish.name, size="50") }}</td>
+                                                                            </tr>
+                                                                            <tr class="dishEditRestForm{{ dish.id }}" style="display:none;">
+                                                                                <td>{{ dish_edit_form.cost.label }}</td>
+                                                                                <td colspan="6">{{ dish_edit_form.cost(value=dish.cost, size="50") }}</td>
+                                                                            </tr>
+                                                                            <tr class="dishEditRestForm{{ dish.id }}" style="display:none;">
+                                                                                <td>{{ dish_edit_form.composition.label }}</td>
+                                                                                <td colspan="6">{{ dish_edit_form.composition(value=dish.composition, size="50") }}</td>
+                                                                            </tr>
+                                                                            <tr class="dishEditRestForm{{ dish.id }}" style="display:none;">
+                                                                                <td>{{ dish_edit_form.category.label }}</td>
+                                                                                <td colspan="6">{{ dish_edit_form.category(value=dish.category, size="50") }}</td>
+                                                                            </tr>
+                                                                            <tr class="dishEditRestForm{{ dish.id }}" style="display:none;">
+                                                                                <td>{{ dish_edit_form.img_file.label }}</td>
+                                                                                <td colspan="6">{{ dish_edit_form.img_file }}</td>
+                                                                            </tr>
+                                                                            <tr class="dishEditRestForm{{ dish.id }}" style="display:none;">
+                                                                                <td>{{ dish_edit_form.dish_edit_submit(class="btn btn-warning", id="dish_" + dish.id|string + "_edit_rest_submit_button") }}</td>
+                                                                            </tr>
+                                                                        </form>
                                                                     </tbody>
                                                                 {% endif %}
                                                             {% endfor %}
@@ -223,7 +737,7 @@
                         <table class="table">
                             <tr>
                                 <td>{{ dish_form.name.label }}</td>
-                                <td>{{ dish_form.name(id="dish_add_name_field") }}</td>
+                                <td >{{ dish_form.name(id="dish_add_name_field") }}</td>
                             </tr>
                             <tr>
                                 <td>{{ dish_form.cost.label }}</td>
@@ -297,6 +811,61 @@
                 </div>
             </div>
         </div>
+
+        <div class="card">
+            <div class="card-header" id="headingPromo">
+                <h2 class="mb-0">
+                    <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapsePromo" aria-expanded="false" aria-controls="collapsePromo">
+                        Добавить Акцию
+                    </button>
+                </h2>
+            </div>
+            <div id="collapsePromo" class="collapse" aria-labelledby="headingPromo" data-parent="#accordionExample">
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Изображение акции</th>
+                                <th scope="col"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for promo_dish in promo_dishes %}
+                            {% if promo_dish.rest_id == ns.rest_id %}
+                                <tr>
+                                    <td style="vertical-align: middle;"><img src="{{ promo_dish.img_link }}" height=100 width=100 align="center"></td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <button id="btnAddPromoRest" type="button">Добавить акцию</button>
+                    <form id="promoDishAddFormRest" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data" action="/admin">
+                        {{ promo_dishes_form.csrf_token() }}
+                        <table class="table">
+                            {{ promo_dishes_form.rest_id(hidden=true, value=ns.rest_id) }}
+                            {{ promo_dishes_form.selected(hidden=true, value=False) }}
+                            <tr>
+                                <td>{{ promo_dishes_form.img_file.label }}</td>
+                                <td>{{ promo_dishes_form.img_file }}</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    {{ promo_dishes_form.promo_dish_submit(class="btn btn-warning") }}
+                                </td>
+                            </tr>
+                        </table>
+                    </form>
+                    <form id="promoDishDelFormRest" method="post" enctype="multipart/form-data">
+                        {{ promo_dishes_delete_form.csrf_token() }}
+                        {{ promo_dishes_delete_form.promo_rest_id(value=ns.rest_id, hidden=true) }}
+                        {{ promo_dishes_delete_form.promo_dish_delete_submit() }}
+                    </form>
+                    <div style="margin-bottom:10px"></div>
+                </div>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header" id="headingThree">
                 <h2 class="mb-0">
@@ -449,7 +1018,6 @@
                         {% for term in delivery_terms %}
                             {% if term.rest_id == ns.rest_id %}
                                 {% set ns.condition = True %}
-                                <!--Here we need to show edit form-->
                                 <form method="post" enctype="multipart/form-data">
                                     {{ rest_delivery_terms_edit_form.csrf_token(id="rest_delivery_form_csrf") }}
                                     <table class="table">
@@ -482,7 +1050,6 @@
                             {% endif %}
                         {% endfor %}
                         {% if not ns.condition %}
-                            <script>console.log("ns.rest_id not in terms");</script>
                             <form method="post" enctype="multipart/form-data">
                                 {{ rest_delivery_terms_form.csrf_token() }}
                                 <table class="table">
@@ -513,6 +1080,46 @@
                                 </table>
                             </form>
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header" id="headingSix">
+                    <h2 class="mb-0">
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseSix" aria-expanded="false" aria-controls="collapseSix">
+                            Статус
+                        </button>
+                    </h2>
+                </div>
+                <div id="collapseSix" class="collapse" aria-labelledby="headingSix" data-parent="#accordionExample">
+                    <div class="card-body">
+                        <form id="restDisable{{ ns.rest_id }}_lk" method="POST" enctype="multipart/form-data">
+                            <table class="table">
+                                {% for restaurant in restaurants %}
+                                    {% if restaurant.id == ns.rest_id %}
+                                        {{ restaurant_edit_form.csrf_token(id="restaurant" + ns.rest_id|string + "_toggle_form_lk_csrf") }}
+                                        {{ restaurant_edit_form.id(value=ns.rest_id, style="display:none;") }}
+                                        {% if restaurant.enabled == True %}
+                                        {{ restaurant_edit_form.enabled(value=false, style="display:none;") }}
+                                        <tr>
+                                            <label>Включен</label>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Выключить", class="btn btn-warning", id="restaurant" + ns_rest_id|string + "_disable_lk_submit_field") }}</td>
+                                        </tr>
+                                        {% elif restaurant.enabled == False %}
+                                        {{ restaurant_edit_form.enabled(value=1, style="display:none;") }}
+                                        <tr>
+                                            <label>Выключен</label>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Включить", class="btn btn-warning", id="restaurant" + ns_rest_id|string + "_enable_lk_submit_field") }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </table>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -548,6 +1155,10 @@
                                 <tr>
                                     <td>{{ restaurant_form.passwd.label }}</td>
                                     <td>{{ restaurant_form.passwd(id="rest_add_passwd_field") }}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ restaurant_form.email.label }}</td>
+                                    <td>{{ restaurant_form.email }}</td>
                                 </tr>
                                 <tr>
                                     {{ restaurant_form.service_uid(value=None) }}
@@ -606,24 +1217,34 @@
                         <div>Количество заказов в сумме отдельно по ресторанам и в общем полная сумма по всем ресторанам за месяц.</div>
                         <button id="btnStat1">Показать</button>
                         <div class="stat1" style="display:none;white-space:pre;">{{ stat1 }}</div>
+
                         <div style="margin-top:15px;">Количество заказов по ресторанам по дням, неделям, в месяце.</div>
                         <button id="btnStat2">Показать</button>
                         <div class="stat2" style="display:none;white-space:pre;">{{ stat2 }}</div>
+
                         <div style="margin-top:15px;">Количество заказов в общем по дням, неделям, в месяце.</div>
                         <button id="btnStat3">Показать</button>
-                        <div class="stat3" style="display:none;">В разработке</div>
-                        <div style="margin-top:15px;">Статистика заказов блюд, какие блюда часто заказывают, какие меньше - суши, пиццу, горячее.</div>
-                        <button id="btnStat4">Показать</button>
-                        <div class="stat4" style="display:none;">В разработке</div>
-                        <div style="margin-top:15px;">Количество изменений в заказе.</div>
-                        <button id="btnStat5">Показать</button>
-                        <div class="stat5" style="display:none;">В разработке</div>
+                        <div class="stat3" style="display:none;white-space:pre;">{{ stat3 }}</div>
+
                         <div style="margin-top:15px;">Количество отмен заказов.</div>
+                        <button id="btnStat4">Показать</button>
+                        <div class="stat4" style="display:none;white-space:pre;">{{ stat4 }}</div>
+
+                        <div style="margin-top:15px;">Уникальные посетители общее количество за месяц.</div>
+                        <button id="btnStat5">Показать</button>
+                        <div class="stat5" style="display:none;white-space:pre;">{{ stat5 }}</div>
+
+                        <div style="margin-top:15px;">Уникальные посетители по дням.</div>
                         <button id="btnStat6">Показать</button>
-                        <div class="stat6" style="display:none;">Количество отмененных заказов - {{ stat6 }}</div>
-                        <div style="margin-top:15px;">Количество уникальных посетителей.</div>
+                        <div class="stat6" style="display:none;white-space:pre;">{{ stat6 }}</div>
+
+                        <div style="margin-top:15px;">Общее количество посещений за месяц.</div>
                         <button id="btnStat7">Показать</button>
-                        <div class="stat7" style="display:none;">Количество уникальных пользователей - {{ stat7 }}</div>
+                        <div class="stat7" style="display:none;white-space:pre;">В разработке</div>
+
+                        <div style="margin-top:15px;">Общее количество посещений за день.</div>
+                        <button id="btnStat8">Показать</button>
+                        <div class="stat8" style="display:none;white-space:pre;">{{ stat8 }}</div>
                     </div>
                 </div>
             </div>
@@ -650,7 +1271,7 @@
                                 </tr>
                                 <tr>
                                     <td>{{ admin_add_form.email.label }}</td>
-                                    <td>{{ admin_add_form.email(type="email", size="50") }}</td>
+                                    <td>{{ admin_add_form.email(type="email", size="50", id="user_email") }}</td>
                                 </tr>
                                 <tr>
                                     <td>{{ admin_add_form.ownership.label }}</td>

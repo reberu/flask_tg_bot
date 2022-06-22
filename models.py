@@ -2,6 +2,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app import db
 from datetime import datetime
+from flask_validator import ValidateEmail
 
 
 class Restaurant(db.Model):
@@ -12,6 +13,13 @@ class Restaurant(db.Model):
     contact = db.Column(db.Text(), nullable=False)
     passwd = db.Column(db.Text())
     service_uid = db.Column(db.Integer())
+    email = db.Column(db.Text(), default=None)
+    min_total = db.Column(db.Integer(), default=0)
+    enabled = db.Column(db.Boolean(), default=True)
+
+    @classmethod
+    def __declare_last__(cls):
+        ValidateEmail(Restaurant.email, True, True, "Почта указана некорректно")
 
 
 class Category(db.Model):
@@ -19,6 +27,13 @@ class Category(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.Text(), nullable=False)
     restaurant_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+
+
+class Subcategory(db.Model):
+    __tablename__ = 'subcategories'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.Text(), nullable=False)
+    category_id = db.Column(db.Integer(), db.ForeignKey('categories.id'))
 
 
 class Dish(db.Model):
@@ -30,6 +45,30 @@ class Dish(db.Model):
     img_link = db.Column(db.Text(), nullable=False)
     category = db.Column(db.Text(), db.ForeignKey('categories.name'))
     id_rest = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+
+
+class SpecialDish(db.Model):
+    __tablename__ = 'special_dishes'
+    id = db.Column(db.Integer(), primary_key=True)
+    subcat_id = db.Column(db.Integer(), nullable=False)
+    dish_id = db.Column(db.Integer(), nullable=False)
+    category_id = db.Column(db.Integer(), nullable=False)
+    rest_id = db.Column(db.Integer(), nullable=False)
+
+
+class PromoDish(db.Model):
+    __tablename__ = 'promo_dishes'
+    id = db.Column(db.Integer(), primary_key=True)
+    img_link = db.Column(db.Text(), nullable=False)
+    rest_id = db.Column(db.Integer(), nullable=False)
+
+
+class Favorites(db.Model):
+    __tablename__ = 'favorites'
+    id = db.Column(db.Integer(), primary_key=True)
+    uid = db.Column(db.Integer(), nullable=False)
+    dish_id = db.Column(db.Integer(), nullable=False)
+    rest_id = db.Column(db.Integer(), nullable=False)
 
 
 class Cart(db.Model):
