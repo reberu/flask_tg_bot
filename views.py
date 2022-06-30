@@ -88,7 +88,8 @@ def index():
                              r'(restaurant_[0-9]+_menu$)|'
                              r'(restaurant_[0-9]+_from_promo)', data):
                     rest_id = int(data.split('_')[1])
-                    categories = db.session.query(Category).filter_by(restaurant_id=rest_id).all()
+                    categories = Category.query.filter_by(restaurant_id=rest_id).all()
+                    rest_name = Restaurant.query.filter_by(id=rest_id).first().name
                     for category in categories:
                         buttons.append(
                             [InlineKeyboardButton(category.name,
@@ -97,7 +98,8 @@ def index():
                     buttons.append([InlineKeyboardButton('Узнать время доставки', callback_data=cb_data)])
                     cb_data = f'restaurant_{rest_id}_delivery_terms'
                     buttons.append([InlineKeyboardButton('Условия доставки', callback_data=cb_data)])
-                    text = 'Пожалуйста выберите подходящую категорию'
+                    text = f'Меню ресторана {rest_name}. В некоторых случаях доставка платная, районы и стоимость ' \
+                           'смотрите в "Условия доставки " в списке меню Ресторана.'
                     cb_data = 'back_to_rest_kb'
                     if 'from_promo' not in data:
                         buttons.append([InlineKeyboardButton('Назад', callback_data=cb_data)])
@@ -141,7 +143,7 @@ def index():
                     rest_id, cat_id = int(data.split('_')[1]), int(data.split('_')[2][3:])
                     category = db.session.query(Category.name).filter_by(id=cat_id).first()[0]
                     rest_name = db.session.query(Restaurant.name).filter_by(id=rest_id).first()[0]
-                    sql_result = db.session.query(Dish).filter_by(id_rest=rest_id, category=category).all()
+                    sql_result = Dish.query.filter_by(id_rest=rest_id, category=category).all()
 
                     if len(data.split('_')) == 8:
                         dish_id = int(data.split('_')[4])
@@ -247,6 +249,10 @@ def index():
                             parse_mode=ParseMode.HTML
                         )
                     else:
+                        text = 'Если отключены автозагрузки фотографий для удобства просмотра блюд включите в ' \
+                               'настройках Telegram - Данные и память, Автозагрузка медиа, включить Фото через ' \
+                               'мобильную сеть и через Wi-Fi. '
+                        BOT.sendMessage(text=text, chat_id=chat_id)
                         for current_id, dish in enumerate(sql_result, start=1):
                             text = f'{rest_name}\n'
                             text += f'<a href="{dish.img_link}">.</a>'
@@ -307,10 +313,50 @@ def index():
                     BOT.sendMessage(text=text, chat_id=chat_id)
                 elif re.search(r'^restaurant_[0-9]+_delivery_time$', data):
                     rest_id = int(data.split('_')[1])
-                    rest = Restaurant.query.filter_by(id=rest_id).first()
-                    text = 'Напишите адрес доставки и что хотите заказать'
-                    BOT.send_message(text=text, chat_id=chat_id)
-                    text += rest.name
+                    user = User.query.filter_by(uid=chat_id).first()
+                    address = user.address
+                    if address:
+                        text = f'Вы указали:\nАдрес доставки: {address}'
+                        cb_data1 = f'rest_{rest_id}_delivery_time_confirm_{chat_id}'
+                        cb_data2 = f'rest_{rest_id}_delivery_time_change_{chat_id}'
+                        buttons = [
+                            [InlineKeyboardButton('Отправить', callback_data=cb_data1)],
+                            [InlineKeyboardButton('Изменить данные', callback_data=cb_data2)]
+                        ]
+                        BOT.send_message(text=text, chat_id=chat_id, reply_markup=InlineKeyboardMarkup(buttons))
+                    else:
+                        rest_name = Restaurant.query.filter_by(id=rest_id).first().name
+                        text = f'Укажите только адрес доставки для ресторана {rest_name}.'
+                        BOT.send_message(text=text, chat_id=chat_id)
+                    write_history(message_id, chat_id, text, is_bot=True)
+                elif re.search(r'(^rest_[0-9]+_delivery_time_confirm_[0-9]+$)', data):
+                    rest = Restaurant.query.filter_by(id=int(data.split('_')[1])).first()
+                    user = User.query.filter_by(uid=int(data.split('_')[5])).first()
+                    text = f'Ваш запрос отправлен, ждем ответа ресторана {rest.name}'
+                    BOT.sendMessage(chat_id=user.uid, text=text)
+                    text = f'Клиент хочет узнать время доставки, укажите примерное время.\n' \
+                           f'Адрес доставки: {user.address}'
+                    cb_text = 'Можем доставить за'
+                    cb_text_no = 'Не можем доставить на этот адрес'
+                    cb_data = f'rest_{rest.id}_uid_{user.uid}_delivery_time'
+                    buttons = [
+                        [InlineKeyboardButton(f'{cb_text} 30 минут', callback_data=f'{cb_data}_30')],
+                        [InlineKeyboardButton(f'{cb_text} 1 час', callback_data=f'{cb_data}_60')],
+                        [InlineKeyboardButton(f'{cb_text} 1 час 30 минут', callback_data=f'{cb_data}_90')],
+                        [InlineKeyboardButton(f'{cb_text} 2 часа', callback_data=f'{cb_data}_120')],
+                        [InlineKeyboardButton(f'{cb_text} 3 часа', callback_data=f'{cb_data}_180')],
+                        [InlineKeyboardButton(cb_text_no, callback_data=f'{cb_data}_no')]
+                    ]
+                    BOT.sendMessage(
+                        chat_id=rest.service_uid,
+                        text=text,
+                        reply_markup=InlineKeyboardMarkup(buttons)
+                    )
+                elif re.search(r'(^rest_[0-9]+_delivery_time_change_[0-9]+$)', data):
+                    rest = Restaurant.query.filter_by(id=int(data.split('_')[1])).first()
+                    user = User.query.filter_by(uid=int(data.split('_')[5])).first()
+                    text = f'Укажите только адрес доставки для ресторана {rest.name}'
+                    BOT.send_message(text=text, chat_id=user.uid)
                     write_history(message_id, chat_id, text, is_bot=True)
                 elif re.search(r'(^cart$)|'
                                r'(^cart_id_[0-9]+$)|'
@@ -558,11 +604,12 @@ def index():
                 elif re.search(r'(^cart_confirm_delivery$)', data):
                     user = User.query.filter_by(uid=chat_id).first()
                     if not user or not user.address:
-                        text = 'Укажите только адрес доставки. Улица, дом, кв, подъезд:'
+                        text = 'Укажите адрес доставки. Улица, дом, кв, подъезд:'
                         BOT.send_message(text=text, chat_id=chat_id)
                     else:
-                        text = "Ваш адрес " + user.address
-                        text += "\nНомер телефона " + user.phone
+                        text = "Вы укалази:\n"
+                        text += "Адрес доставки: " + user.address
+                        text += "\nКонтактный номер: " + user.phone
                         buttons = [
                             [InlineKeyboardButton('Отправить', callback_data='order_confirm')],
                             [InlineKeyboardButton('Изменить данные', callback_data='cart_confirm_change')]
@@ -574,7 +621,7 @@ def index():
                         )
                     write_history(message_id, chat_id, text, is_bot=True)
                 elif re.search(r'(^cart_confirm_takeaway$)', data):
-                    text = 'Напишите во сколько хотите забрать Ваш заказ.'
+                    text = 'Напишите во сколько хотите забрать Ваш заказ ( в цифрах без букв)'
                     BOT.sendMessage(
                         text=text,
                         chat_id=chat_id
@@ -582,7 +629,7 @@ def index():
                     write_history(message_id, chat_id, text, is_bot=True)
 
                 elif re.search(r'(^cart_confirm_change$)', data):
-                    text = 'Укажите только адрес доставки. Улица, дом, кв, подъезд:'
+                    text = 'Укажите адрес доставки. Улица, дом, кв, подъезд:'
                     BOT.send_message(text=text, chat_id=chat_id)
                     write_history(message_id, chat_id, text, is_bot=True)
 
@@ -590,7 +637,8 @@ def index():
                     rest_menu_edit_msg(chat_id, message_id)
                 elif re.search(r'(^order_confirm$)|'
                                r'(^order_confirm_takeaway_.+)', data):
-                    cart = db.session.query(Cart).filter_by(user_uid=chat_id).all()
+                    cart = Cart.query.filter_by(user_uid=chat_id).all()
+                    rest = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
                     total = sum(list(map(lambda good: good.price * good.quantity, cart)))
                     current_tz = pytz.timezone('Asia/Yakutsk')
                     try:
@@ -599,14 +647,12 @@ def index():
                             first_name=first_name,
                             last_name=last_name,
                             order_total=total,
-                            order_rest_id=cart[0].restaurant_id,
+                            order_rest_id=rest.id,
                             order_datetime=datetime.now(current_tz).strftime('%s'),
                             order_confirm=False
                         )
                         db.session.add(order)
-                        db.session.flush()
-                        rest_name = db.session.query(Restaurant.name).filter_by(id=order.order_rest_id).first()[0]
-                        text = f'Заказ оформлен, ждем подтверждения ресторана {rest_name}'
+                        text = f'Заказ оформлен, ждем подтверждения ресторана {rest.name}'
                         BOT.send_message(chat_id=order.uid, text=text)
 
                         text = f'Поступил заказ № {order.id}\n'
@@ -649,17 +695,14 @@ def index():
                                 [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                             ]
 
-                        db.session.query(Cart).filter_by(user_uid=chat_id).delete()
-                        service_uid = db.session.query(Restaurant.service_uid).filter_by(
-                            id=order.order_rest_id).first()[0]
+                        Cart.query.filter_by(user_uid=chat_id).delete()
                         db.session.commit()
 
-                        BOT.send_message(chat_id=service_uid, text=text, reply_markup=InlineKeyboardMarkup(buttons))
+                        BOT.send_message(chat_id=rest.service_uid, text=text, reply_markup=InlineKeyboardMarkup(buttons))
                         write_history(message_id, chat_id, text, is_bot=True)
 
                         # Отправка email
-                        rest_mail = Restaurant.query.filter_by(id=order.order_rest_id).first().email
-                        send_email(rest_mail, f"Поступил заказ из Robofood № {order.id}", text)
+                        send_email(rest.email, f"Поступил заказ из Robofood № {order.id}", text)
 
                     except IndexError:
                         text = "Произошла ошибка IndexError в order_confirm\n"
@@ -786,7 +829,7 @@ def index():
                         db.session.commit()
                     except Exception:
                         BOT.send_message(chat_id=service_uid, text='При попытке удалить блюдо произошла ошибка')
-                    details = db.session.query(OrderDetail).filter_by(order_id=order_id).all()
+                    details = OrderDetail.query.filter_by(order_id=order_id).all()
                     text = f'Что хотите изменить в заказе № {order.id}?'
                     buttons = []
                     if details:
@@ -808,14 +851,17 @@ def index():
                     else:
                         try:
                             markup = rest_menu_keyboard()
+                            uid = Order.query.filter_by(id=order_id).first().uid
+                            rest_id = Order.query.filter_by(id=order_id).first().order_rest_id
+                            rest_name = Restaurant.query.filter_by(id=rest_id).first().name
                             if not markup.inline_keyboard:
-                                text = 'Ресторан отменил заказ. В данное время нет работающих ресторанов'
-                                BOT.send_message(chat_id=chat_id, text=text)
+                                text = f'Ресторан {rest_name} отменил заказ. В данное время нет работающих ресторанов'
+                                BOT.send_message(chat_id=uid, text=text)
                             else:
-                                text = 'Ресторан отменил заказ. Пожалуйста, выберите ресторан:'
-                                BOT.send_message(chat_id=chat_id, text=text, reply_markup=markup)
-                            db.session.query(Order).filter_by(id=order_id).delete()
-                            db.session.query(OrderDetail).filter_by(order_id=order_id).delete()
+                                text = f'Ресторан {rest_name} отменил заказ. Пожалуйста, выберите ресторан:'
+                                BOT.send_message(chat_id=uid, text=text, reply_markup=markup)
+                            OrderDetail.query.filter_by(order_id=order_id).delete()
+                            Order.query.filter_by(id=order_id).delete()
                             db.session.commit()
                             text = 'Заказ отменен, клиенту направлено соответствующее сообщение'
                             BOT.send_message(chat_id=service_uid, text=text)
@@ -1348,8 +1394,7 @@ def index():
                         if chat_id in [113737020, 697637170]:
                             BOT.send_message(chat_id=chat_id, text='СТАТИСТИКА', reply_markup=stat_menu_keyboard())
                         else:
-                            text = 'Бот только учится разговаривать, он пока не умеет общаться, ' \
-                                   'поэтому просим использовать кнопки😊'
+                            text = 'Бот действует через кнопки. Начните с кнопки "Меню" в нижнем левом углу😊'
                             BOT.send_message(chat_id=chat_id, text=text)
                     elif parse_text(message) is None:
                         try:
@@ -1427,7 +1472,7 @@ def index():
                                     parse_mode=ParseMode.HTML
                                 )
                                 return 'Order change'
-                            elif bot_msg == 'Укажите только адрес доставки. Улица, дом, кв, подъезд:':
+                            elif bot_msg == 'Укажите адрес доставки. Улица, дом, кв, подъезд:':
                                 usr_msg = History.query.filter_by(chat_id=chat_id).order_by(History.id.desc()).first()
                                 cur_usr = db.session.query(User).filter_by(uid=chat_id).first()
                                 cur_usr.address = usr_msg.message_text
@@ -1452,7 +1497,7 @@ def index():
                                 BOT.send_message(chat_id=chat_id,
                                                  text=text,
                                                  reply_markup=InlineKeyboardMarkup(buttons))
-                            elif bot_msg == 'Напишите во сколько хотите забрать Ваш заказ.':
+                            elif bot_msg == 'Напишите во сколько хотите забрать Ваш заказ ( в цифрах без букв)':
                                 phone = User.query.filter_by(uid=chat_id).first().phone
                                 text = ''
                                 if phone:
@@ -1509,12 +1554,10 @@ def index():
                                 BOT.send_message(chat_id=chat_id,
                                                  text=text,
                                                  reply_markup=InlineKeyboardMarkup(buttons))
-                            elif 'Напишите адрес доставки и что хотите заказать' in bot_msg:
-                                rest_name = bot_msg[45:]
-                                bot_msg = History.query.filter_by(
-                                    chat_id=chat_id,
-                                    is_bot=False
-                                ).order_by(History.id.desc()).first().message_text
+                                User.query.filter_by(uid=chat_id).first().phone = phone
+                                db.session.commit()
+                            elif 'Укажите только адрес доставки для ресторана' in bot_msg:
+                                rest_name = bot_msg[44:]
                                 address = message
                                 rest = Restaurant.query.filter_by(name=rest_name).first()
                                 text = f'Ваш запрос отправлен, ждем ответа ресторана {rest_name}'
@@ -1541,14 +1584,12 @@ def index():
                                 client.address = address
                                 db.session.commit()
                             else:
-                                text = 'Бот только учится разговаривать, он пока не умеет общаться, ' \
-                                       'поэтому просим использовать кнопки😊'
+                                text = 'Бот действует через кнопки. Начните с кнопки "Меню" в нижнем левом углу😊'
                                 BOT.send_message(chat_id=chat_id, text=text)
                         except TypeError:
                             pass
                     else:
-                        text = 'Бот только учится разговаривать, он пока не умеет общаться, ' \
-                               'поэтому просим использовать кнопки😊'
+                        text = 'Бот действует через кнопки. Начните с кнопки "Меню" в нижнем левом углу😊'
                         BOT.send_message(chat_id=chat_id, text=text)
 
                 except telegram.error.Unauthorized:
@@ -1872,12 +1913,11 @@ def admin():
             min_total = restaurant_edit_form.min_total.data
             rest = Restaurant.query.filter_by(id=rest_id).first()
             owner = Admin.query.filter_by(ownership=rest.name).first()
+            enabled = rest.enabled
             if request.form['rest_edit_submit'] == 'Включить':
                 enabled = True
             elif request.form['rest_edit_submit'] == 'Выключить':
                 enabled = False
-            else:
-                enabled = restaurant_edit_form.enabled.data
             if name:
                 rest.name = name
                 if owner:
@@ -1892,8 +1932,7 @@ def admin():
                 rest.email = email
             if min_total:
                 rest.min_total = min_total
-            if enabled is True or enabled is False:
-                rest.enabled = enabled
+            rest.enabled = enabled
             db.session.commit()
             flash("Изменения успешно внесены", "success")
             return redirect(url_for('admin'))
@@ -1989,6 +2028,7 @@ def admin():
         stat4=stat4(),
         stat5=stat5(),
         stat6=stat6(),
+        stat7=stat7(),
         stat8=stat8()
     )
 
@@ -2071,60 +2111,37 @@ def rest_menu_send_msg(chat_id):
 
 def rest_menu_keyboard():
     """Возвращает меню с наименованиями ресторанов"""
+
+    def is_time_between(begin_time, ending_time, check_time=None):
+        # If check time is not given, default to current time
+        check_time = check_time or datetime.now(YKT).time()
+        if begin_time < ending_time:
+            return begin_time <= check_time <= ending_time
+        else:  # crosses midnight
+            return check_time >= begin_time or check_time <= ending_time
+
     restaurants = Restaurant.query.filter(Restaurant.id != 1).all()
     keyboard = []
     YKT = pytz.timezone('Asia/Yakutsk')
-    rest = {'name': '', 'start_hour': '', 'start_minute': '', 'end_hour': '', 'end_minute': ''}
-    current_hour = datetime.now(YKT).strftime('%H')
-    current_minute = datetime.now().strftime('%M')
-    time = r'^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$'
-    double_time = r'^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]-([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$'
-    time_check = r'^.+([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$'
+    current_time = datetime.now(YKT).time()
+    pattern = r'(([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9](-|\s-\s)([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])'
     for restaurant in restaurants:
         if not restaurant.enabled:
             continue
-        for item in restaurant.name.split(' '):
-            if re.search(time, item):
-                rest['name'] = restaurant.name
-                if not rest['start_hour']:
-                    rest['start_hour'] = item[:2]
-                    rest['start_minute'] = item[3:]
-                else:
-                    rest['end_hour'] = item[:2]
-                    rest['end_minute'] = item[3:]
-                try:
-                    if int(rest['start_hour']) < int(current_hour) < int(rest['end_hour']):
-                        keyboard.append(
-                            [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
-                    elif int(rest['start_hour']) == int(current_hour):
-                        if int(rest['start_minute']) <= int(current_minute):
-                            keyboard.append(
-                                [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
-                    elif int(rest['end_hour']) == int(current_hour):
-                        if int(rest['end_minute']) > int(current_minute):
-                            keyboard.append(
-                                [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
-                except ValueError:
-                    pass
-            elif re.search(double_time, item):
-                rest['name'] = restaurant.name
-                rest['start_hour'] = item.split('-')[0][:2]
-                rest['start_minute'] = item.split('-')[0][3:]
-                rest['end_hour'] = item.split('-')[1][:2]
-                rest['end_minute'] = item.split('-')[1][3:]
-                if int(rest['start_hour']) < int(current_hour) < int(rest['end_hour']):
-                    keyboard.append(
-                        [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
-                elif int(rest['start_hour']) == int(current_hour):
-                    if int(rest['start_minute']) <= int(current_minute):
-                        keyboard.append(
-                            [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
-                elif int(rest['end_hour']) == int(current_hour):
-                    if int(rest['end_minute']) > int(current_minute):
-                        keyboard.append(
-                            [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
-        if not re.search(time_check, restaurant.name):
+        if match := re.search(pattern, restaurant.name, re.IGNORECASE):
+            if ' ' not in match.group(1):
+                start_time = datetime.strptime(match.group(1).split('-')[0], '%H:%M').time()
+                end_time = datetime.strptime(match.group(1).split('-')[1], '%H:%M').time()
+            else:
+                start_time = datetime.strptime(match.group(1).split(' ')[0], '%H:%M').time()
+                end_time = datetime.strptime(match.group(1).split(' ')[2], '%H:%M').time()
+
+            if is_time_between(start_time, end_time, current_time):
+                keyboard.append(
+                    [InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
+        else:
             keyboard.append([InlineKeyboardButton(f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}')])
+
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -2151,7 +2168,10 @@ def write_history(msg_id, chat_id, text, is_bot):
 
 def stat1():
     current_month = datetime.now().month
-    stat_data = Order.query.all()
+    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    # stat_data = Order.query.all()
+    stat_data = Order.query.filter(Order.order_datetime.between(first_day, today)).all()
     text = ''
     for month in MONTHS:
         if month > current_month:
@@ -2179,16 +2199,16 @@ def stat1():
 
 def stat2():
     current_month = datetime.now().month
-    stat_data = db.session.query(Order).order_by(Order.order_rest_id).all()
+    first_day = datetime.today().replace(day=1, hour=0, minute=0, second=0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    stat_data = Order.query.filter(Order.order_datetime.between(first_day, today)).order_by(Order.order_rest_id).all()
     rests_data, text = [], ''
     rest = Restaurant.query
     for data in stat_data:
-        month = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
-        if month == current_month and data.order_state == 'Подтверждена' and rest.filter_by(
-                id=data.order_rest_id).first():
+        if data.order_state == 'Подтверждена' and rest.filter_by(id=data.order_rest_id).first():
             rest_name = rest.filter_by(id=data.order_rest_id).first().name
             day = str(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
-            rests_data.append([rest_name, day, data.order_total, month])
+            rests_data.append([rest_name, day, data.order_total, '{:02d}'.format(current_month)])
     for i in range(len(rests_data)):
         if i == 0 or (i != 0 and rests_data[i][0] != rests_data[i - 1][0]):
             text += f'{rests_data[i][0]}\n'
@@ -2200,14 +2220,15 @@ def stat2():
 
 def stat3():
     current_month = datetime.now().month
-    order_data = Order.query.all()
+    first_day = datetime.today().replace(day=1, hour=0, minute=0, second=0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    order_data = Order.query.filter(Order.order_datetime.between(first_day, today)).all()
     text = f'{MONTHS[current_month].capitalize()}\n'
     stat = {}
     days = []
     for data in order_data:
-        month = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
         day = int(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
-        if month == current_month and data.order_state == 'Подтверждена':
+        if data.order_state == 'Подтверждена':
             if day in days:
                 stat.update({day: stat[day] + 1})
             else:
@@ -2231,7 +2252,10 @@ def stat4():
 
 
 def stat5():
-    stat_data = History.query.all()
+    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    # stat_data = History.query.all()
+    stat_data = History.query.filter(History.date.between(first_day, today)).all()
     current_month = datetime.now().month
     users = []
     text = f'{datetime.now().year} г.\n'
@@ -2261,7 +2285,10 @@ def stat5():
 
 
 def stat6():
-    stat_data = History.query.all()
+    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    # stat_data = History.query.all()
+    stat_data = History.query.filter(History.date.between(first_day, today)).all()
     current_month = datetime.now().month
     users = []
     text = f'{datetime.now().year} г.\n'
@@ -2292,7 +2319,10 @@ def stat6():
 
 
 def stat7():
-    stat_data = History.query.all()
+    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    # stat_data = History.query.all()
+    stat_data = History.query.filter(History.date.between(first_day, today)).all()
     current_month = datetime.now().month
     text = f'{datetime.now().year} г.\n'
     for month in MONTHS:
@@ -2318,7 +2348,10 @@ def stat7():
 
 
 def stat8():
-    stat_data = History.query.all()
+    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now().strftime('%s')
+    stat_data = History.query.filter(History.date.between(first_day, today)).all()
+    # stat_data = History.query.all()
     current_month = datetime.now().month
     text = f'{datetime.now().year} г.\n'
     for month in MONTHS:
