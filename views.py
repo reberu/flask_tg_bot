@@ -37,6 +37,7 @@ from transliterate import translit
 
 BOT = Bot(BOT_TOKEN)
 URL = f'https://api.telegram.org/bot{BOT_TOKEN}/'
+YKT = pytz.timezone('Asia/Yakutsk')
 
 
 @app.route('/', methods=['POST', 'GET'])
@@ -640,21 +641,21 @@ def index():
                     cart = Cart.query.filter_by(user_uid=chat_id).all()
                     rest = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
                     total = sum(list(map(lambda good: good.price * good.quantity, cart)))
-                    current_tz = pytz.timezone('Asia/Yakutsk')
                     try:
                         order = Order(
+                            id=Order.query.order_by(Order.id.desc()).first().id+1,
                             uid=chat_id,
                             first_name=first_name,
                             last_name=last_name,
                             order_total=total,
                             order_rest_id=rest.id,
-                            order_datetime=datetime.now(current_tz).strftime('%s'),
+                            order_datetime=datetime.now(YKT).strftime('%s'),
                             order_confirm=False
                         )
-                        db.session.add(order)
+
                         text = f'Заказ оформлен, ждем подтверждения ресторана {rest.name}'
                         BOT.send_message(chat_id=order.uid, text=text)
-
+                        print(order.id)
                         text = f'Поступил заказ № {order.id}\n'
                         text += 'Состав заказа:\n'
                         for item in cart:
@@ -694,7 +695,7 @@ def index():
                                 [InlineKeyboardButton('Не принят', callback_data='None')],
                                 [InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=cb_data)]
                             ]
-
+                        db.session.add(order)
                         Cart.query.filter_by(user_uid=chat_id).delete()
                         db.session.commit()
 
@@ -1152,7 +1153,7 @@ def index():
                                         for item in cart:
                                             total += item.price
                                         cb_text = f'В корзину: заказ на сумму {total} р'
-                                        buttons.append([InlineKeyboardButton(cb_text, callback_data='cart_confirm')])
+                                        buttons.append([InlineKeyboardButton(cb_text, callback_data='cart')])
                                         BOT.send_message(
                                             chat_id=chat_id,
                                             text=text,
@@ -1160,7 +1161,18 @@ def index():
                                             parse_mode=ParseMode.HTML
                                         )
                 elif re.search(r'^user_orders_[0-9]+$', data):
-                    BOT.sendMessage(chat_id=chat_id, text='Мои заказы')
+                    order = Order.query.filter_by(uid=chat_id).order_by(Order.id.desc()).first()
+                    if order:
+                        details = OrderDetail.query.filter_by(order_id=order.id).all()
+                        text = f'Заказ № {order.id}\n'
+                        text += f'Статус: {order.order_state}\n'
+                        text += 'Состав заказа:\n'
+                        for item in details:
+                            text += f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n'
+                        text += f'Сумма - {order.order_total} р.'
+                    else:
+                        text = 'У вас нет заказов'
+                    BOT.sendMessage(chat_id=chat_id, text=text)
                 elif re.search(r'^show_contract$', data):
                     BOT.send_message(chat_id, 'https://telegra.ph/Polzovatelskoe-soglashenie-12-07-5')
                 elif re.search(r'^show_rules$', data):
@@ -1285,7 +1297,7 @@ def index():
                                             for item in cart:
                                                 total += item.price
                                             cb_text = f'В корзину: заказ на сумму {total} р'
-                                            buttons.append([InlineKeyboardButton(cb_text, callback_data='cart_confirm')])
+                                            buttons.append([InlineKeyboardButton(cb_text, callback_data='cart')])
                                             BOT.send_message(
                                                 chat_id=chat_id,
                                                 text=text,
@@ -1296,8 +1308,8 @@ def index():
                     elif parse_text(message) == 'Рекомендуем' or parse_text(message) == '/recommend':
                         text = 'Рекомендуем'
                         buttons = []
-                        for i, subcat in enumerate(Subcategory.query.all(), start=1):
-                            buttons.append([InlineKeyboardButton(subcat.name, callback_data=f'subcat_recommend_{i}')])
+                        for sub in Subcategory.query.all():
+                            buttons.append([InlineKeyboardButton(sub.name, callback_data=f'subcat_recommend_{sub.id}')])
                         BOT.send_message(chat_id=chat_id, text=text, reply_markup=InlineKeyboardMarkup(buttons))
                         write_history(message_id, chat_id, text, is_bot=True)
                     elif parse_text(message) == 'Акции' or parse_text(message) == '/promotions':
@@ -2122,7 +2134,6 @@ def rest_menu_keyboard():
 
     restaurants = Restaurant.query.filter(Restaurant.id != 1).all()
     keyboard = []
-    YKT = pytz.timezone('Asia/Yakutsk')
     current_time = datetime.now(YKT).time()
     pattern = r'(([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9](-|\s-\s)([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])'
     for restaurant in restaurants:
@@ -2154,10 +2165,11 @@ def stat_menu_keyboard():
 
 
 def write_history(msg_id, chat_id, text, is_bot):
+
     msg = History(
         message_id=msg_id,
         chat_id=chat_id,
-        date=datetime.now().strftime('%s'),
+        date=datetime.now(YKT).strftime('%s'),
         type='message',
         message_text=text,
         is_bot=is_bot
@@ -2167,10 +2179,9 @@ def write_history(msg_id, chat_id, text, is_bot):
 
 
 def stat1():
-    current_month = datetime.now().month
-    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
-    today = datetime.now().strftime('%s')
-    # stat_data = Order.query.all()
+    current_month = datetime.now(YKT).month
+    first_day = datetime(datetime.now(YKT).year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     stat_data = Order.query.filter(Order.order_datetime.between(first_day, today)).all()
     text = ''
     for month in MONTHS:
@@ -2198,9 +2209,9 @@ def stat1():
 
 
 def stat2():
-    current_month = datetime.now().month
+    current_month = datetime.now(YKT).month
     first_day = datetime.today().replace(day=1, hour=0, minute=0, second=0).strftime('%s')
-    today = datetime.now().strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     stat_data = Order.query.filter(Order.order_datetime.between(first_day, today)).order_by(Order.order_rest_id).all()
     rests_data, text = [], ''
     rest = Restaurant.query
@@ -2219,9 +2230,9 @@ def stat2():
 
 
 def stat3():
-    current_month = datetime.now().month
+    current_month = datetime.now(YKT).month
     first_day = datetime.today().replace(day=1, hour=0, minute=0, second=0).strftime('%s')
-    today = datetime.now().strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     order_data = Order.query.filter(Order.order_datetime.between(first_day, today)).all()
     text = f'{MONTHS[current_month].capitalize()}\n'
     stat = {}
@@ -2252,13 +2263,12 @@ def stat4():
 
 
 def stat5():
-    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
-    today = datetime.now().strftime('%s')
-    # stat_data = History.query.all()
+    first_day = datetime(datetime.now(YKT).year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     stat_data = History.query.filter(History.date.between(first_day, today)).all()
-    current_month = datetime.now().month
+    current_month = datetime.now(YKT).month
     users = []
-    text = f'{datetime.now().year} г.\n'
+    text = f'{datetime.now(YKT).year} г.\n'
     for month in MONTHS:
         if month > current_month:
             break
@@ -2285,13 +2295,12 @@ def stat5():
 
 
 def stat6():
-    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
-    today = datetime.now().strftime('%s')
-    # stat_data = History.query.all()
+    first_day = datetime(datetime.now(YKT).year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     stat_data = History.query.filter(History.date.between(first_day, today)).all()
-    current_month = datetime.now().month
+    current_month = datetime.now(YKT).month
     users = []
-    text = f'{datetime.now().year} г.\n'
+    text = f'{datetime.now(YKT).year} г.\n'
     for month in MONTHS:
         if month > current_month:
             break
@@ -2319,12 +2328,11 @@ def stat6():
 
 
 def stat7():
-    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
-    today = datetime.now().strftime('%s')
-    # stat_data = History.query.all()
+    first_day = datetime(datetime.now(YKT).year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     stat_data = History.query.filter(History.date.between(first_day, today)).all()
-    current_month = datetime.now().month
-    text = f'{datetime.now().year} г.\n'
+    current_month = datetime.now(YKT).month
+    text = f'{datetime.now(YKT).year} г.\n'
     for month in MONTHS:
         if month > current_month:
             break
@@ -2348,12 +2356,11 @@ def stat7():
 
 
 def stat8():
-    first_day = datetime(datetime.now().year, 1, 1, 0, 0, 0).strftime('%s')
-    today = datetime.now().strftime('%s')
+    first_day = datetime(datetime.now(YKT).year, 1, 1, 0, 0, 0).strftime('%s')
+    today = datetime.now(YKT).strftime('%s')
     stat_data = History.query.filter(History.date.between(first_day, today)).all()
-    # stat_data = History.query.all()
-    current_month = datetime.now().month
-    text = f'{datetime.now().year} г.\n'
+    current_month = datetime.now(YKT).month
+    text = f'{datetime.now(YKT).year} г.\n'
     for month in MONTHS:
         if month > current_month:
             break
