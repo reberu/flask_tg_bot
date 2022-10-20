@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block script %}
+<script>
+    $( document ).ready(function() {
+        for (let j = 1; j < 9; j++) {
+            $("#btnStat" + j).click(function(){
+                $(".stat" + j).toggle();
+            });
+        }
+    });
+</script>
+{% endblock %}
+{% block title %}
+    Панель статистики
+{% endblock %}
+{% block content %}
+    <h2 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html" style="margin-top:25px;margin-bottom:25px;">Панель статистики</h2>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul class=flashes>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+    <div class="row">
+        <div class="col">
+            <p class="text-md-start">Количество заказов в сумме отдельно по ресторанам и в общем полная сумма по всем ресторанам за месяц.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat1" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat1" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat1 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Количество заказов по ресторанам по дням, неделям, в месяце.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat2" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat2" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat2 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Количество заказов в общем по дням, неделям, в месяце.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat3" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat3" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat3 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Количество отмен заказов.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat4" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat4" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat4 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Уникальные посетители общее количество за месяц.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat5" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat5" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat5 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Уникальные посетители по дням.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat6" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat6" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat6 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Общее количество посещений за месяц.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat7" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat7" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat7 }}</p>
+            </div>
+        </div>
+        <div class="w-100"></div>
+
+        <div class="col">
+            <p class="text-md-start">Общее количество посещений за день.</p>
+        </div>
+        <div class="col">
+            <button id="btnStat8" type="button" class="btn btn-light">Показать</button>
+        </div>
+        <div class="w-100">
+            <div class="stat8" style="display:none;white-space:pre;">
+                <p class="text-md-start">{{ stat8 }}</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -36,6 +36,20 @@
               <a class="nav-link active" aria-current="page" href="\contract">Ознакомиться с договором</a>
             </li>
           {% endif %}
+          {% if current_user.ownership == 'all' %}
+              <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="\admin">Админка</a>
+              </li>
+              <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="\statistics">Статистика</a>
+              </li>
+              <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="\send_message">Отправить сообщение</a>
+              </li>
+              <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="\database">База данных</a>
+              </li>
+          {% endif %}
           </ul>
           {% if current_user.is_authenticated %}
             <div style="margin-right: 1%">Вы вошли как {{ current_user.username }}</div>
@@ -52,7 +66,15 @@
     </nav>
     <div class="container">
         <div class="row">
-
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class=flashes>
+                        {% for category, message in messages %}
+                            <li class="{{ category }}">{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
             {% block content %}
 
             {% endblock %}

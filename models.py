@@ -163,3 +163,21 @@ class RestaurantDeliveryTerms(db.Model):
     rest_ogrn = db.Column(db.Integer())
     rest_fullname = db.Column(db.String())
     rest_address = db.Column(db.String())
+
+
+class SearchWords(db.Model):
+    __tablename__ = 'search_words'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String())
+    words = db.Column(db.String())
+    # search_dish_id = db.Column(db.Integer(), db.ForeignKey('search_dishes.id'))
+
+
+class SearchDishes(db.Model):
+    __tablename__ = 'search_dishes'
+    id = db.Column(db.Integer(), primary_key=True)
+    dish_id = db.Column(db.Integer(), db.ForeignKey('dishes.id'))
+    dish_name = db.Column(db.String(), db.ForeignKey('dishes.name'))
+    dish_category = db.Column(db.String(), db.ForeignKey('categories.name'))
+    rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+    search_words_id = db.Column(db.Integer(), db.ForeignKey('search_words.id'))

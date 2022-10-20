@@ -26,6 +26,20 @@
             $("#subCatDelForm").toggle();
         });
 
+        $("#btnAddCmd").click(function(){
+            $("#searchWordForm").toggle();
+        });
+
+        $("#btnDelCmd").click(function(){
+            $("#searchWordDelForm").toggle();
+        });
+
+        {% for search_word in search_words %}
+            $("#btnCmdAddDish_{{search_word.id}}").click(function(){
+                $("#searchDishAddForm_{{search_word.id}}").toggle();
+            });
+        {% endfor %}
+
         {% for restaurant in restaurants %}
             $("#btnRestEdit" + {{ restaurant.id }}).click(function(){
                 $("#restEdit" + {{ restaurant.id }}).toggle();
@@ -53,12 +67,6 @@
                 }
             });
         {% endfor %}
-
-        for (let j = 1; j < 9; j++) {
-            $("#btnStat" + j).click(function(){
-                $(".stat" + j).toggle();
-            });
-        }
     });
 </script>
 {% endblock %}
@@ -68,16 +76,7 @@
 
 {% block content %}
     {% set ns = namespace (rest_id = 0, condition = False) %}
-<h2 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">Личный кабинет</h2>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <ul class=flashes>
-                    {% for message in messages %}
-                        <li>{{ message }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+<h2 xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html" style="margin-top:25px;margin-bottom:25px;">Личный кабинет</h2>
         {% if current_user.ownership == 'all' %}
             <ul>Вы администратор всех ресторанов</ul>
                 <div class="accordion" id="accordionRests">
@@ -454,6 +453,184 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
+                                    <div class="card">
+                                        <div class="card-header" id="headingAdminCommandRest{{ restaurant.id }}">
+                                            <h5 class="mb-0">
+                                                <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminCommandRest{{ restaurant.id }}" aria-expanded="false" aria-controls="collapseAdminCommandRest{{ restaurant.id }}">
+                                                    <div>Команды</div>
+                                                </button>
+                                            </h5>
+                                        </div>
+                                        <div id="collapseAdminCommandRest{{ restaurant.id }}" class="collapse">
+                                            <div class="accordion" id="accordionAdminSubCommandRest{{ restaurant.id }}">
+                                                {% for search_word in search_words %}
+                                                <div class="card">
+                                                    <div class="card-header" id="headingAdminSubCommand{{ search_word.id }}">
+                                                        <h5 class="mb-0">
+                                                            <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseAdminSubCommand{{ search_word.id }}" aria-expanded="false" aria-controls="collapseAdminSubCommand{{ search_word.id }}">
+                                                                <div>{{ search_word.name }}</div>
+                                                            </button>
+                                                        </h5>
+                                                    </div>
+                                                </div>
+                                                <div id="collapseAdminSubCommand{{ search_word.id }}" class="collapse">
+                                                    <table class="table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th scope="col"></th>
+                                                                <th scope="col">Название блюда</th>
+                                                                <th scope="col">Ресторан</th>
+                                                                <th scope="col"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for search_dish in search_dishes %}
+                                                                {% if search_dish.search_words_id == search_word.id %}
+                                                                <tr>
+                                                                    <th scope="row"></th>
+                                                                    <td>{{ search_dish.dish_name }}</td>
+                                                                    <td>
+                                                                        {% for rest in restaurants %}
+                                                                            {% if rest.id == search_dish.rest_id %}
+                                                                                {{ rest.name }}
+                                                                            {% endif %}
+                                                                        {% endfor %}
+                                                                    </td>
+                                                                    <td>
+                                                                        <form method="post">
+                                                                            {{ search_dish_del_form.csrf_token(id="search_dish" + search_dish.id|string + "_delete_form_csrf") }}
+                                                                            {{ search_dish_del_form.search_dish_id(hidden=true, value=search_dish.id, id="search_dish" + search_dish.id|string + "_delete_id") }}
+                                                                            {{ search_dish_del_form.search_dish_del_submit(class="btn btn-danger", id="search_dish" + search_dish.id|string + "_delete_submit_field") }}
+                                                                        </form>
+                                                                    </td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                    <button id="btnCmdAddDish_{{search_word.id}}" type="button" class="btn btn-primary">Добавить блюдо в команду</button>
+                                                    <form id="searchDishAddForm_{{search_word.id}}" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data">
+                                                        {{ search_dish_form.csrf_token() }}
+                                                        <table class="table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th scope="col" colspan="2">Слова команды: {{ search_word.words }}</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr>
+                                                                    <th scope="row">{{ search_dish_form.rest_id.label }}</th>
+                                                                    <td>
+                                                                        {{ search_dish_form.rest_id(hidden=true) }}
+                                                                        <select id="search_dish_rest_selector_{{search_word.id}}" name="search_dish_rest_selector_{{search_word.id}}" onchange="searchDishSelCategory_{{search_word.id}}();" required>
+                                                                            <option selected disabled></option>
+                                                                            {% for restaurant in restaurants %}
+                                                                                <option value="{{ restaurant.id }}">{{ restaurant.name }}</option>
+                                                                            {% endfor %}
+                                                                        </select>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th scope="row">Категория</th>
+                                                                    <td>
+                                                                        <select id="search_dish_cat_selector_{{search_word.id}}" name="search_dish_cat_selector_{{search_word.id}}" required>
+                                                                            <option selected disabled></option>
+                                                                        </select>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th scope="row">{{ search_dish_form.dish_id.label }}</th>
+                                                                    <td>
+                                                                        {{ search_dish_form.dish_id(hidden=true) }}
+                                                                        <select id="search_dish_selector_{{search_word.id}}" name="search_dish_selector_{{search_word.id}}" required>
+                                                                            <option selected disabled></option>
+                                                                        </select>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th scope="row">{{ search_dish_form.search_word_id(hidden=true, value=search_word.id) }}</th>
+                                                                    <td>{{ search_dish_form.search_dish_submit(class="btn btn-primary") }}</td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </form>
+                                                    <script>
+                                                        function searchDishSelCategory_{{search_word.id}}() {
+                                                            let search_dish_category_select = document.getElementById('search_dish_cat_selector_{{search_word.id}}');
+                                                            var category_options = '';
+                                                            var search_dish_rest_id = document.getElementById('search_dish_rest_selector_{{search_word.id}}').value;
+                                                            {% for category in categories %}
+                                                                if ( search_dish_rest_id == {{ category.restaurant_id|safe }} ) {
+                                                                    category_options += '<option value="{{ category.id|safe }}">{{ category.name|safe }}</option>>';
+                                                                }
+                                                            {% endfor %}
+                                                            search_dish_category_select.innerHTML = category_options;
+                                                            $('#search_dish_cat_selector_{{search_word.id}}').on('change', function() {
+                                                                let search_dish_select = document.getElementById('search_dish_selector_{{search_word.id}}');
+                                                                var dishes_options = '';
+                                                                let search_dish_rest_id = $("#search_dish_rest_selector_{{search_word.id}}").val();
+                                                                let search_dish_category_text = $("#search_dish_cat_selector_{{search_word.id}} option:selected").text();
+                                                                {% for dish in dishes %}
+                                                                    if (search_dish_rest_id == Number('{{ dish.id_rest }}') && search_dish_category_text == '{{ dish.category }}') {
+                                                                        dishes_options += '<option value="{{ dish.id|safe }}">{{ dish.name|safe }}</option>';
+                                                                    }
+                                                                {% endfor %}
+                                                                search_dish_select.innerHTML = dishes_options;
+                                                            });
+                                                        }
+                                                    </script>
+                                                </div>
+                                                <br/>
+                                                {% endfor %}
+                                                <button id="btnAddCmd" type="button" class="btn btn-primary">Добавить команду</button>
+                                                <form id="searchWordForm" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data">
+                                                    {{ search_word_form.csrf_token() }}
+                                                    <table class="table">
+                                                        <tr>
+                                                            <th scope="row"></th>
+                                                            <td>{{ search_word_form.search_name.label }}</td>
+                                                            <td>{{ search_word_form.search_name }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th scope="row"></th>
+                                                            <td>{{ search_word_form.search_word.label }}</td>
+                                                            <td>{{ search_word_form.search_word }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th scope="row"></th>
+                                                            <td>{{ search_word_form.search_word_submit(class="btn btn-success") }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </form>
+                                                <button id="btnDelCmd" type="button" class="btn btn-secondary">Удалить команду</button>
+                                                <form id="searchWordDelForm" style="display:none;white-space:pre;" method="post" enctype="multipart/form-data">
+                                                    {{ search_word_del_form.csrf_token() }}
+                                                    <table class="table">
+                                                        <tr>
+                                                            <th scope="row"></th>
+                                                            <td>Выберите команду</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th scope="row"></th>
+                                                            <td>
+                                                                {{ search_word_del_form.search_word(hidden=true) }}
+                                                                <select id="search_word_selector" name="search_word_selector" required>
+                                                                    <option selected disabled></option>
+                                                                    {% for search_word in search_words %}
+                                                                        <option value="{{ search_word.id }}">{{ search_word.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th scope="row"></th>
+                                                            <td>{{ search_word_del_form.search_word_del_submit(class="btn btn-danger") }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1201,50 +1378,6 @@
                                 </tr>
                             </table>
                         </form>
-                    </div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-header" id="headingStat">
-                    <h5 class="mb-0">
-                        <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse" data-target="#collapseStat" aria-expanded="false" aria-controls="collapseStat">
-                            Статистика
-                        </button>
-                    </h5>
-                </div>
-                <div id="collapseStat" class="collapse" aria-labelledby="headingStat" data-parent="#accordionRest">
-                    <div class="card-body">
-                        <div>Количество заказов в сумме отдельно по ресторанам и в общем полная сумма по всем ресторанам за месяц.</div>
-                        <button id="btnStat1">Показать</button>
-                        <div class="stat1" style="display:none;white-space:pre;">{{ stat1 }}</div>
-
-                        <div style="margin-top:15px;">Количество заказов по ресторанам по дням, неделям, в месяце.</div>
-                        <button id="btnStat2">Показать</button>
-                        <div class="stat2" style="display:none;white-space:pre;">{{ stat2 }}</div>
-
-                        <div style="margin-top:15px;">Количество заказов в общем по дням, неделям, в месяце.</div>
-                        <button id="btnStat3">Показать</button>
-                        <div class="stat3" style="display:none;white-space:pre;">{{ stat3 }}</div>
-
-                        <div style="margin-top:15px;">Количество отмен заказов.</div>
-                        <button id="btnStat4">Показать</button>
-                        <div class="stat4" style="display:none;white-space:pre;">{{ stat4 }}</div>
-
-                        <div style="margin-top:15px;">Уникальные посетители общее количество за месяц.</div>
-                        <button id="btnStat5">Показать</button>
-                        <div class="stat5" style="display:none;white-space:pre;">{{ stat5 }}</div>
-
-                        <div style="margin-top:15px;">Уникальные посетители по дням.</div>
-                        <button id="btnStat6">Показать</button>
-                        <div class="stat6" style="display:none;white-space:pre;">{{ stat6 }}</div>
-
-                        <div style="margin-top:15px;">Общее количество посещений за месяц.</div>
-                        <button id="btnStat7">Показать</button>
-                        <div class="stat7" style="display:none;white-space:pre;">{{ stat7 }}</div>
-
-                        <div style="margin-top:15px;">Общее количество посещений за день.</div>
-                        <button id="btnStat8">Показать</button>
-                        <div class="stat8" style="display:none;white-space:pre;">{{ stat8 }}</div>
                     </div>
                 </div>
             </div>

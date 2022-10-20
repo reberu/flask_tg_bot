@@ -49,6 +49,29 @@ class SpecialDishForm(FlaskForm):
     s_dish_add_submit = SubmitField("Добавить")
 
 
+class SearchDishForm(FlaskForm):
+    dish_id = IntegerField('Блюдо')
+    rest_id = IntegerField('Ресторан')
+    search_word_id = IntegerField('Идентификатор команды')
+    search_dish_submit = SubmitField('Добавить')
+
+
+class SearchDishDelForm(FlaskForm):
+    search_dish_id = IntegerField('Блюдо')
+    search_dish_del_submit = SubmitField('Удалить')
+
+
+class SearchWordForm(FlaskForm):
+    search_name = TextField('Название команды')
+    search_word = TextField('Команда')
+    search_word_submit = SubmitField('Добавить')
+
+
+class SearchWordDelForm(FlaskForm):
+    search_word = TextField('Команда')
+    search_word_del_submit = SubmitField('Удалить')
+
+
 class PromoDishForm(FlaskForm):
     img_file = FileField("Загрузите изображение", validators=[DataRequired()])
     rest_id = IntegerField('Ресторан')
@@ -164,3 +187,8 @@ class RestaurantDeliveryTermsEditForm(FlaskForm):
     rest_fullname = StringField("Название организации")
     rest_address = StringField("Адрес")
     terms_edit_submit = SubmitField("Изменить")
+
+
+class DateForm(FlaskForm):
+    date = StringField("Дата")
+    date_submit = SubmitField("Показать")
