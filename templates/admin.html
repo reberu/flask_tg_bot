@@ -728,7 +728,6 @@
                                     <table class="table">
                                         {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_edit_form_csrf") }}
                                         {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;", id="restaurant" + restaurant.id|string + "_edit_form_id_field") }}
-                                        {{ restaurant_edit_form.enabled(value=restaurant.enabled, style="display:none;") }}
                                         <tr>
                                             <td>{{ restaurant_edit_form.name.label }}</td>
                                             <td>{{ restaurant_edit_form.name(value=restaurant.name, size="50", id="rest" + restaurant.id|string + "_name_field") }}</td>
@@ -761,23 +760,23 @@
                                 <button id="btnRestDisable{{ restaurant.id }}" type="button">Статус</button>
                                 <form id="restDisable{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
                                     <table class="table">
-                                        {{ restaurant_edit_form.csrf_token(id="restaurant" + restaurant.id|string + "_toggle_form_csrf") }}
-                                        {{ restaurant_edit_form.id(value=restaurant.id, style="display:none;") }}
+                                        {{ restaurant_enable_form.csrf_token(id="restaurant" + restaurant.id|string + "_toggle_form_csrf") }}
+                                        {{ restaurant_enable_form.rest_id(value=restaurant.id, style="display:none;") }}
                                         {% if restaurant.enabled == True %}
-                                        {{ restaurant_edit_form.enabled(value=false, style="display:none;") }}
+                                        {{ restaurant_enable_form.status(value=false, style="display:none;") }}
                                         <tr>
                                             <label>Включен</label>
                                         </tr>
                                         <tr>
-                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Выключить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_disable_submit_field") }}</td>
+                                            <td>{{ restaurant_enable_form.rest_enable_submit(value="Выключить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_disable_submit_field") }}</td>
                                         </tr>
                                         {% elif restaurant.enabled == False %}
-                                        {{ restaurant_edit_form.enabled(value=1, style="display:none;") }}
+                                        {{ restaurant_enable_form.status(value=1, style="display:none;") }}
                                         <tr>
                                             <label>Выключен</label>
                                         </tr>
                                         <tr>
-                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Включить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_enable_submit_field") }}</td>
+                                            <td>{{ restaurant_enable_form.rest_enable_submit(value="Включить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_enable_submit_field") }}</td>
                                         </tr>
                                         {% endif %}
                                     </table>

@@ -4,7 +4,10 @@
 {% endblock %}
 {% block content %}
     <h3 style="padding: 20px;">Отправка сообщения всем пользователям бота</h3><br><br>
-    <form method="POST" enctype="multipart/form-data">
+    <script>
+        document.send_msg_form.reset();
+    </script>
+    <form method="POST" name="send_msg_form" enctype="multipart/form-data">
         <div class="form-group row" style="padding: 20px;">
             <label for="msg_img" class="col-sm-2 col-form-label">Изображение</label>
             <div class="col-sm-10">

@@ -13,7 +13,7 @@ class Restaurant(db.Model):
     contact = db.Column(db.Text(), nullable=False)
     passwd = db.Column(db.Text())
     service_uid = db.Column(db.Integer())
-    email = db.Column(db.Text(), default=None)
+    email = db.Column(db.Text())
     min_total = db.Column(db.Integer(), default=0)
     enabled = db.Column(db.Boolean(), default=True)
 
@@ -106,7 +106,7 @@ class Order(db.Model):
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
     order_datetime = db.Column(db.Integer())
     order_confirm = db.Column(db.Boolean(), default=False)
-    order_state = db.Column(db.Text(), default='Собран')
+    order_state = db.Column(db.Text())
 
 
 class OrderDetail(db.Model):
@@ -132,6 +132,7 @@ class History(db.Model):
 
 
 class Admin(db.Model, UserMixin):
+    """Admin model"""
     __tablename__ = 'admins'
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(100))

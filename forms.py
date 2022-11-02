@@ -138,8 +138,13 @@ class RestaurantEditForm(FlaskForm):
     passwd = StringField("Кодовая фраза")
     email = StringField("Электронная почта", validators=[Email()])
     min_total = IntegerField("Минимальная сумма заказа")
-    enabled = BooleanField()
     rest_edit_submit = SubmitField("Отправить", id="id_rest_edit_submit")
+
+
+class RestaurantsEnableForm(FlaskForm):
+    rest_id = HiddenField("Hidden restaurant id field")
+    status = BooleanField()
+    rest_enable_submit = SubmitField("Изменить")
 
 
 class RestaurantDeleteForm(FlaskForm):
