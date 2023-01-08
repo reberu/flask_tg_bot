@@ -47,22 +47,28 @@ YKT = pytz.timezone('Asia/Yakutsk')
 @app.route('/', methods=['POST', 'GET'])
 def index():
     if request.method == 'POST' and request.get_json()['update_id']:
-        data = request.get_json()
-        chat_id = data['callback_query']['message']['chat']['id'] if 'callback_query' in data else data['message']['chat']['id']
+        js_data = request.get_json()
         try:
-            first_name = data['callback_query']['message']['chat']['first_name'] if 'callback_query' in data else data['message']['chat']['first_name']
+            chat_id = js_data['callback_query']['message']['chat']['id'] if 'callback_query' in js_data else js_data['message']['chat']['id']
+        except KeyError:
+            chat_id = None
+        try:
+            first_name = js_data['callback_query']['message']['chat']['first_name'] if 'callback_query' in js_data else js_data['message']['chat']['first_name']
         except KeyError:
             first_name = None
         try:
-            last_name = data['callback_query']['message']['chat']['last_name'] if 'callback_query' in data else data['message']['chat']['last_name']
+            last_name = js_data['callback_query']['message']['chat']['last_name'] if 'callback_query' in js_data else js_data['message']['chat']['last_name']
         except KeyError:
             last_name = None
         try:
-            username = data['callback_query']['message']['chat']['username'] if 'callback_query' in data else data['message']['chat']['username']
+            username = js_data['callback_query']['message']['chat']['username'] if 'callback_query' in js_data else js_data['message']['chat']['username']
         except KeyError:
             username = None
-        message_id = data['callback_query']['message']['message_id'] if 'callback_query' in data else data['message']['message_id']
-        msg_text = data['callback_query']['message']['text'] if 'callback_query' in data else data['message']['text']
+        try:
+            message_id = js_data['callback_query']['message']['message_id'] if 'callback_query' in js_data else js_data['message']['message_id']
+            msg_text = js_data['callback_query']['message']['text'] if 'callback_query' in js_data else js_data['message']['text']
+        except KeyError:
+            pass
 
         user = db.session.query(User).filter_by(uid=chat_id).first()
         if not user:
@@ -72,8 +78,8 @@ def index():
         write_history(message_id, chat_id, msg_text, is_bot=False)
 
         # Callback handlers
-        if 'callback_query' in data:
-            data = data['callback_query']['data']
+        if 'callback_query' in js_data:
+            data = js_data['callback_query']['data']
             print(data)
             buttons = []
             if re.search(r'(restaurant_[0-9]+$)|'
@@ -198,6 +204,8 @@ def index():
                             db.session.query(Cart).filter_by(name=dish_name, user_uid=cur_chat_id,
                                                              restaurant_id=data.split('_')[1]).delete()
                             db.session.commit()
+                        else:
+                            pass
                     text = f'{rest_name}\n'
                     text += f'<a href="{sql_result[cur_id].img_link}">.</a>'
                     text += f'\n<b>{dish_name}</b>'
@@ -232,13 +240,17 @@ def index():
                         [InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu')])
                     buttons.append(
                         [InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart')])
-                    BOT.editMessageText(
-                        chat_id=cur_chat_id,
-                        text=text,
-                        message_id=message_id,
-                        reply_markup=InlineKeyboardMarkup(buttons),
-                        parse_mode=ParseMode.HTML
-                    )
+                    try:
+                        BOT.editMessageText(
+                            chat_id=cur_chat_id,
+                            text=text,
+                            message_id=message_id,
+                            reply_markup=InlineKeyboardMarkup(buttons),
+                            parse_mode=ParseMode.HTML
+                        )
+                    except Exception as e:
+                        print(e)
+                        pass
                 else:
                     text = 'Если отключены автозагрузки фотографий для удобства просмотра блюд включите в ' \
                            'настройках Telegram - Данные и память, Автозагрузка медиа, включить Фото через ' \
@@ -310,8 +322,9 @@ def index():
                     text = f'Вы указали:\nАдрес доставки: {address}'
                     cb_data1 = f'rest_{rest_id}_delivery_time_confirm_{chat_id}'
                     cb_data2 = f'rest_{rest_id}_delivery_time_change_{chat_id}'
+                    bt_text = 'Отправить и узнать время доставки'
                     buttons = [
-                        [InlineKeyboardButton('Отправить', callback_data=cb_data1)],
+                        [InlineKeyboardButton(bt_text, callback_data=cb_data1)],
                         [InlineKeyboardButton('Изменить данные', callback_data=cb_data2)]
                     ]
                     BOT.send_message(text=text, chat_id=chat_id, reply_markup=InlineKeyboardMarkup(buttons))
@@ -647,7 +660,8 @@ def index():
                         order_state="Заказ отправлен, ожидание ответа ресторана."
                     )
 
-                    text = f'Заказ оформлен, ждем подтверждения ресторана {rest.name}'
+                    text = f'Заказ отправлен, ждите ответа ресторана {rest.name}. За статусом заказа смотрите в "Мои ' \
+                           f'заказы" в разделе Справка. '
                     BOT.send_message(chat_id=order.uid, text=text)
                     write_history(message_id, chat_id, text, is_bot=True)
                     text = f'Поступил заказ № {order.id}\n'
@@ -674,7 +688,8 @@ def index():
                         ]
                     else:
                         text += f'Адрес доставки" ' \
-                                f'{db.session.query(User.address).filter_by(uid=order.uid).first()[0]}'
+                                f'{db.session.query(User.address).filter_by(uid=order.uid).first()[0]} \n' \
+                                'Перейдите в чат-бот, чтобы обработать заказ https://t.me/robofood1bot'
                         buttons = [
                             [InlineKeyboardButton(bt_text + ' за 30 минут',
                                                   callback_data=f'order_accept_{order.id}_30')],
@@ -873,7 +888,8 @@ def index():
                 service_uid = db.session.query(Restaurant.service_uid).filter_by(
                     id=order.order_rest_id).first()[0]
                 if re.search(r'(^order_[0-9]+_user_confirm$)', data):
-                    text = f'Заказ оформлен, ждем подтверждения ресторана {rest_name}'
+                    text = f'Заказ отправлен ждите ответа ресторана {rest_name}. За статусом заказа смотрите в "Мои ' \
+                           f'заказы" в разделе Справка. '
                     status = 'Заказ отправлен, ожидание ответа ресторана'
                     Order.query.filter_by(id=int(data.split('_')[1])).first().order_state = status
                     BOT.send_message(chat_id=order.uid, text=text)
@@ -1058,7 +1074,7 @@ def index():
                     db.session.commit()
                     text = 'Блюдо добавлено в избранное'
                     BOT.answer_callback_query(
-                        callback_query_id=data['callback_query']['id'],
+                        callback_query_id=js_data['callback_query']['id'],
                         show_alert=False, text=text
                     )
                 else:
@@ -1066,7 +1082,7 @@ def index():
                     Favorites.query.filter_by(uid=uid, dish_id=dish_id, rest_id=rest_id).delete()
                     db.session.commit()
                     BOT.answer_callback_query(
-                        callback_query_id=data['callback_query']['id'],
+                        callback_query_id=js_data['callback_query']['id'],
                         show_alert=False, text=text
                     )
             elif re.search(r'^fav_[0-9]+_rest_[0-9]+$', data):
@@ -1205,18 +1221,23 @@ def index():
             name = first_name if first_name else username
             parsed = parse_text(msg_text)
             try:
-                bot_msg = History.query.filter_by(
-                    chat_id=chat_id,
-                    is_bot=True
-                ).order_by(History.id.desc()).first().message_text
-                restaurants = db.session.query(Restaurant).all()
-                print('bot_msg:', bot_msg)
+                try:
+                    bot_msg = History.query.filter_by(
+                        chat_id=chat_id,
+                        is_bot=True
+                    ).order_by(History.id.desc()).first().message_text
+                    restaurants = db.session.query(Restaurant).all()
+                    print('bot_msg:', bot_msg)
+                except AttributeError:
+                    bot_msg = None
                 # Обработка события /start
                 if parsed == '/start':
-                    text = f'Приветствую, {name}!\nВыбери что нужно.'
+                    text = "*Добро пожаловать в Robofood*😊\n_Здесь_ `Вы` можете заказать еду из ресторанов на " \
+                           "доставку и самовывоз\.\ Начните с кнопки “Меню” или наберите в сообщении " \
+                           "интересующую еду 🍱🥤🍕 "
                     remove_keyboard = {'remove_keyboard': True}
                     remove_keyboard_encoded = json.dumps(remove_keyboard)
-                    BOT.send_message(chat_id, text, reply_markup=remove_keyboard_encoded)
+                    BOT.send_message(chat_id, text, reply_markup=remove_keyboard_encoded, parse_mode=ParseMode.MARKDOWN_V2)
                 elif parsed == '/my_orders':
                     order = Order.query.filter_by(uid=chat_id, order_state='Подтверждена')
                     order = order.order_by(Order.id.desc()).first()
@@ -1650,14 +1671,14 @@ def index():
                                     db.session.commit()
                                     return 'Restaurant service uid correction'
                             if not History.query.filter_by(chat_id=chat_id).order_by(History.id.desc()).first().is_bot:
-                                text = 'Бот действует через кнопки. Начните с кнопки "Меню" в нижнем левом углу😊'
+                                text = 'Не могу найти то, что Вы ищете🧐 Попробуйте изменить запрос😊'
                                 BOT.send_message(chat_id=chat_id, text=text)
             except telegram.error.Unauthorized:
                 pass
             except TypeError:
                 pass
             finally:
-                print('msg:', data['message']['text'])
+                print('msg:', js_data['message']['text'])
         return 'Telegram message'
     elif request.method == 'GET':
         return render_template('index.html')
@@ -1699,16 +1720,56 @@ def logout():
 @login_required
 def statistics():
     return render_template(
-        'statistics.html',
-        stat1=stat1(),
-        stat2=stat2(),
-        stat3=stat3(),
-        stat4=stat4(),
-        stat5=stat5()[0],
-        stat6=stat6(),
-        stat7=stat7(),
-        stat8=stat8()
+        'statistics.html'
     )
+
+
+@app.route('/statistics/1', methods=['GET'])
+@login_required
+def statistics1():
+    return render_template('stat1.html', stat1=stat1())
+
+
+@app.route('/statistics/2', methods=['GET'])
+@login_required
+def statistics2():
+    return render_template('stat2.html', stat2=stat2())
+
+
+@app.route('/statistics/3', methods=['GET'])
+@login_required
+def statistics3():
+    return render_template('stat3.html', stat3=stat3())
+
+
+@app.route('/statistics/4', methods=['GET'])
+@login_required
+def statistics4():
+    return render_template('stat4.html', stat4=stat4())
+
+
+@app.route('/statistics/5', methods=['GET'])
+@login_required
+def statistics5():
+    return render_template('stat5.html', stat5=stat5()[0])
+
+
+@app.route('/statistics/6', methods=['GET'])
+@login_required
+def statistics6():
+    return render_template('stat6.html', stat6=stat6())
+
+
+@app.route('/statistics/7', methods=['GET'])
+@login_required
+def statistics7():
+    return render_template('stat7.html', stat7=stat7())
+
+
+@app.route('/statistics/8', methods=['GET'])
+@login_required
+def statistics8():
+    return render_template('stat8.html', stat8=stat8())
 
 
 @app.route('/database', methods=['GET', 'POST'])
@@ -1870,12 +1931,16 @@ def admin():
             except:
                 pass
             try:
-                dish = Dish.query.filter_by(id=id_dish, id_rest=id_rest).first()
+                dish = Dish.query.filter_by(id=id_dish).first()
+                search_dish = SearchDishes.query.filter_by(dish_id=id_dish).first()
                 dish.name = name
+                search_dish.dish_name = name
                 dish.id_rest = id_rest
+                search_dish.rest_id = id_rest
                 dish.cost = cost
                 dish.composition = composition
                 dish.category = category
+                search_dish.dish_category = category
                 if file_flag:
                     dish.img_link = img_link
                 db.session.commit()
@@ -2027,7 +2092,8 @@ def admin():
 
     if dish_delete_form.validate_on_submit() and dish_delete_form.dish_delete_submit.data:
         dish_id = dish_delete_form.delete_id.data
-        db.session.query(Dish).filter_by(id=dish_id).delete()
+        Dish.query.filter_by(id=dish_id).delete()
+        SearchDishes.query.filter_by(dish_id=dish_id).delete()
         db.session.commit()
         flash("Блюдо успешно удалено", "success")
         return redirect(url_for('admin'))
@@ -2321,8 +2387,8 @@ def stat1():
         current_month_rests_total = {}
         for data in stat_data:
             order_date = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
-            if order_date == month and 'принят' in data.order_state and Restaurant.query.filter_by(
-                    id=data.order_rest_id).first():
+            if order_date == month and ('Подтверждена' or 'Заказ принят рестораном' in data.order_state) \
+                    and Restaurant.query.filter_by(id=data.order_rest_id).first():
                 current_month_total += data.order_total
                 rest_name = Restaurant.query.filter_by(id=data.order_rest_id).first().name
                 try:
@@ -2346,7 +2412,7 @@ def stat2():
     rests_data, text = [], ''
     rest = Restaurant.query
     for data in stat_data:
-        if 'принят' in data.order_state and rest.filter_by(id=data.order_rest_id).first():
+        if ('Подтверждена' or 'Заказ принят рестораном' in data.order_state) and rest.filter_by(id=data.order_rest_id).first():
             rest_name = rest.filter_by(id=data.order_rest_id).first().name
             day = str(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
             rests_data.append([rest_name, day, data.order_total, '{:02d}'.format(current_month)])
@@ -2371,7 +2437,7 @@ def stat3():
     days = []
     for data in order_data:
         day = int(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
-        if 'принят' in data.order_state:
+        if 'Подтверждена' or 'Заказ принят рестораном' in data.order_state:
             if day in days:
                 stat.update({day: stat[day] + 1})
             else:

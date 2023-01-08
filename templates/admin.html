@@ -1273,23 +1273,23 @@
                             <table class="table">
                                 {% for restaurant in restaurants %}
                                     {% if restaurant.id == ns.rest_id %}
-                                        {{ restaurant_edit_form.csrf_token(id="restaurant" + ns.rest_id|string + "_toggle_form_lk_csrf") }}
-                                        {{ restaurant_edit_form.id(value=ns.rest_id, style="display:none;") }}
+                                        {{ restaurant_enable_form.csrf_token(id="restaurant" + restaurant.id|string + "_toggle_form_lk_csrf") }}
+                                        {{ restaurant_enable_form.rest_id(value=restaurant.id, style="display:none;") }}
                                         {% if restaurant.enabled == True %}
-                                        {{ restaurant_edit_form.enabled(value=false, style="display:none;") }}
+                                        {{ restaurant_enable_form.status(value=false, style="display:none;") }}
                                         <tr>
                                             <label>Включен</label>
                                         </tr>
                                         <tr>
-                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Выключить", class="btn btn-warning", id="restaurant" + ns_rest_id|string + "_disable_lk_submit_field") }}</td>
+                                            <td>{{ restaurant_enable_form.rest_enable_submit(value="Выключить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_disable_submit_field") }}</td>
                                         </tr>
                                         {% elif restaurant.enabled == False %}
-                                        {{ restaurant_edit_form.enabled(value=1, style="display:none;") }}
+                                        {{ restaurant_enable_form.status(value=1, style="display:none;") }}
                                         <tr>
                                             <label>Выключен</label>
                                         </tr>
                                         <tr>
-                                            <td>{{ restaurant_edit_form.rest_edit_submit(value="Включить", class="btn btn-warning", id="restaurant" + ns_rest_id|string + "_enable_lk_submit_field") }}</td>
+                                            <td>{{ restaurant_enable_form.rest_enable_submit(value="Включить", class="btn btn-warning", id="restaurant" + restaurant.id|string + "_enable_submit_field") }}</td>
                                         </tr>
                                         {% endif %}
                                     {% endif %}
