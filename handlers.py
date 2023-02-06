@@ -1,25 +1,25 @@
 from sqlalchemy import func
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from app import db
-from models import Category, Restaurant, PromoDish, Dish, Cart
+from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User
 from settings import BOT
-from utils import rest_menu_keyboard
+from utils import rest_menu_keyboard, write_history
 
 
 def restaurant_callback(call):
-    keyboard = InlineKeyboardMarkup()
     data = call.data.split('_')
     rest_id = data[1]
     categories = Category.query.filter_by(restaurant_id=rest_id)
     rest_name = Restaurant.query.filter_by(id=rest_id).first().name
 
     def categories_menu():
+        keyboard = InlineKeyboardMarkup()
         for category in categories.all():
             keyboard.add(
                 InlineKeyboardButton(text=category.name, callback_data=f'restaurant_{rest_id}_cat_{category.id}'))
-        cb_data = f'restaurant_{rest_id}_delivery_time'
+        cb_data = f'restaurant_{rest_id}_delivery_time_call_back'
         keyboard.add(InlineKeyboardButton(text='Узнать время доставки', callback_data=cb_data))
-        cb_data = f'restaurant_{rest_id}_delivery_terms'
+        cb_data = f'restaurant_{rest_id}_delivery_terms_show'
         keyboard.add(InlineKeyboardButton('Условия доставки', callback_data=cb_data))
         text = f'Меню ресторана {rest_name}. В некоторых случаях доставка платная, районы и стоимость ' \
                'смотрите в "Условия доставки " в списке меню Ресторана.'
@@ -63,6 +63,7 @@ def restaurant_callback(call):
         return 'Ok'
 
     def dish_change():
+        keyboard = InlineKeyboardMarkup()
         operation = {'add': 1, 'rem': -1}
         dish = Dish.query.filter_by(id=int(data[5])).first()
         cart_item = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
@@ -124,11 +125,38 @@ def restaurant_callback(call):
             parse_mode='HTML'
         )
 
+    def show_terms():
+        terms = RestaurantDeliveryTerms.query.filter_by(rest_id=rest_id).first()
+        text = 'Ресторан не предоставил сведений'
+        if terms:
+            text = f'{terms.terms}\nИНН: {terms.rest_inn if terms.rest_inn else ""}\n'
+            text += f'ОГРН: {terms.rest_ogrn if terms.rest_ogrn else ""}\n'
+            text += f'Название организации: {terms.rest_fullname if terms.rest_fullname else ""}\n'
+            text += f'Адрес: {terms.rest_address if terms.rest_address else ""}'
+        BOT.send_message(chat_id=call.from_user.id, text=text)
+
+    def show_delivery_time():
+        user = User.query.filter_by(uid=call.from_user.id).first()
+        text = f'Укажите только адрес доставки для ресторана {rest_name}.'
+        keyboard = None
+        if user.address:
+            keyboard = InlineKeyboardMarkup()
+            text = f'Вы указали:\nАдрес доставки: {user.address}'
+            cb_data1 = f'restaurant_{rest_id}_delivery_time_confirm_{call.from_user.id}'
+            cb_data2 = f'restaurant_{rest_id}_delivery_time_change_{call.from_user.id}'
+            cb_text = 'Отправить и узнать время доставки'
+            keyboard.add(InlineKeyboardButton(text=cb_text, callback_data=cb_data1))
+            keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data=cb_data2))
+        BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=keyboard if keyboard else None)
+        write_history(call.message.id, call.from_user.id, text, True)
+
     print(data)
     options = {
         2: categories_menu,
         3: categories_menu,
         4: show_dishes,
+        5: show_terms,
+        6: show_delivery_time,
         8: dish_change,
     }
     options.get(len(data))()
