@@ -1,7 +1,4 @@
-import time
-
 from sqlalchemy import func
-from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from app import db
 from models import Category, Restaurant, PromoDish, Dish, Cart
@@ -71,6 +68,7 @@ def restaurant_callback(call):
         cart_item = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
         dish_count = cart_item.quantity if cart_item else 0
         if data[6] == 'add' and dish_count == 0:
+            print('add when count 0')
             new_item = Cart(
                 name=dish.name,
                 price=dish.cost,
@@ -84,17 +82,28 @@ def restaurant_callback(call):
             )
             db.session.add(new_item)
             db.session.commit()
-        else:
+        elif data[6] == 'add' or 'rem' and dish_count > 1:
+            print('add/rem when count > 1')
             cart_item.quantity += operation.get(data[6])
-            if cart_item.quantity < 0:
-                return 'Ok', 200
             db.session.commit()
+        elif data[6] == 'rem' and dish_count == 0:
+            print('rem when 0')
+            return 'Ok', 200
+        elif data[6] == 'rem' and dish_count == 1:
+            print('rem when 1')
+            Cart.query.filter_by(id=cart_item.id).delete()
+            db.session.commit()
+        dish_count = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
+        dish_count = dish_count.quantity if dish_count else 0
+        print(dish_count)
+        total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+        total = total[0][0] if total[0][0] else 0
+        print(total)
         text = f'{rest_name}\n'
         text += f'<a href="{dish.img_link}">.</a>'
         text += f'\n<b>{dish.name}</b>'
         text += f'\n{dish.composition}'
         text += f'\n{dish.cost} р.'
-        dish_count = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first().quantity
         cb_first = f'restaurant_{rest_id}_cat_{int(data[3])}_dish_{dish.id}'
         cb_last = f'{call.from_user.id}'
         cb_data = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
@@ -104,10 +113,9 @@ def restaurant_callback(call):
             InlineKeyboardButton(f'{dish_count} шт', callback_data='None'),
             InlineKeyboardButton('+️', callback_data=f'{cb_first}_add_{cb_last}')
         )
-        total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
-        total = total[0][0] if total[0][0] else 0
         keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu'))
         keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
+        print('bot sendmsg')
         BOT.edit_message_text(
             chat_id=call.from_user.id,
             text=text,
@@ -119,6 +127,7 @@ def restaurant_callback(call):
     print(data)
     options = {
         2: categories_menu,
+        3: categories_menu,
         4: show_dishes,
         8: dish_change,
     }

@@ -2,6 +2,7 @@ import datetime
 from itertools import chain
 
 import pytz
+import telebot.types
 from flask import render_template, flash, redirect, url_for, Response
 from sqlalchemy.util import symbol
 
@@ -197,10 +198,15 @@ def promotions(message):
 
 @BOT.message_handler(commands=['show_cart'])
 def show_cart(message):
-    cart = Cart.query.filter_by(user_uid=message.chat.id).all()
+    print(type(message))
+    if type(message) is telebot.types.CallbackQuery:
+        chat_id = message.from_user.id
+    else:
+        chat_id = message.chat.id
+    cart = Cart.query.filter_by(user_uid=chat_id).all()
     if not cart:
         text = 'Ваша корзина пуста'
-        BOT.send_message(chat_id=message.chat.id, text=text)
+        BOT.send_message(chat_id=chat_id, text=text)
         return 'Ok', 200
     keyboard = InlineKeyboardMarkup()
     rest = db.session.query(Restaurant.name).filter_by(id=cart[0].restaurant_id).first()[0]
@@ -227,7 +233,7 @@ def show_cart(message):
         InlineKeyboardButton('Меню️️', callback_data=f'restaurant_{cart[0].restaurant_id}')
     )
     keyboard.add(InlineKeyboardButton(f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
-    BOT.send_message(text=text, chat_id=message.chat.id, parse_mode="HTML", reply_markup=keyboard)
+    BOT.send_message(text=text, chat_id=chat_id, parse_mode="HTML", reply_markup=keyboard)
 
 
 @BOT.message_handler(commands=["favorites"])
@@ -282,6 +288,9 @@ def callback_query(call):
         'cart': cart_callback,
         'order': order_callback,
     }
+    if call.data == 'cart':
+        show_cart(call)
+        return 'Ok', 200
     options.get(req[0], other_callback)(call)
 
 
