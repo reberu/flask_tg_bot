@@ -142,12 +142,32 @@ def restaurant_callback(call):
         if user.address:
             keyboard = InlineKeyboardMarkup()
             text = f'Вы указали:\nАдрес доставки: {user.address}'
-            cb_data1 = f'restaurant_{rest_id}_delivery_time_confirm_{call.from_user.id}'
+            cb_data1 = f'restaurant_{rest_id}_delivery_time_confirm_{call.from_user.id}_data'
             cb_data2 = f'restaurant_{rest_id}_delivery_time_change_{call.from_user.id}'
             cb_text = 'Отправить и узнать время доставки'
             keyboard.add(InlineKeyboardButton(text=cb_text, callback_data=cb_data1))
             keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data=cb_data2))
         BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=keyboard if keyboard else None)
+        write_history(call.message.id, call.from_user.id, text, True)
+
+    def delivery_time_confirm():
+        user = User.query.filter_by(uid=call.from_user.id).first()
+        service_uid = Restaurant.query.filter_by(id=rest_id).first().service_uid
+        text = f'Ваш запрос отправлен, ждем ответа ресторана {rest_name}'
+        BOT.send_message(chat_id=user.uid, text=text)
+        text = f'Клиент хочет узнать время доставки, укажите примерное время.\n' \
+               f'Адрес доставки: {user.address}'
+        cb_text = 'Можем доставить за'
+        cb_text_no = 'Не можем доставить на этот адрес'
+        cb_data = f'restaurant_{rest_id}_uid_{user.uid}_delivery_time'
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 30 минут', callback_data=f'{cb_data}_30'))
+        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 1 час', callback_data=f'{cb_data}_60'))
+        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 1 час 30 минут', callback_data=f'{cb_data}_90'))
+        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 2 часа', callback_data=f'{cb_data}_120'))
+        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 3 часа', callback_data=f'{cb_data}_180'))
+        keyboard.add(InlineKeyboardButton(text=cb_text_no, callback_data=f'{cb_data}_no'))
+        BOT.send_message(chat_id=service_uid, text=text, reply_markup=keyboard)
         write_history(call.message.id, call.from_user.id, text, True)
 
     print(data)
@@ -157,6 +177,7 @@ def restaurant_callback(call):
         4: show_dishes,
         5: show_terms,
         6: show_delivery_time,
+        7: delivery_time_confirm,
         8: dish_change,
     }
     options.get(len(data))()
