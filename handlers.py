@@ -159,7 +159,7 @@ def restaurant_callback(call):
                f'Адрес доставки: {user.address}'
         cb_text = 'Можем доставить за'
         cb_text_no = 'Не можем доставить на этот адрес'
-        cb_data = f'restaurant_{rest_id}_uid_{user.uid}_delivery_time'
+        cb_data = f'restaurant_{rest_id}_uid_{user.uid}_delivery_time_callback_time_count'
         keyboard = InlineKeyboardMarkup()
         keyboard.add(InlineKeyboardButton(text=f'{cb_text} 30 минут', callback_data=f'{cb_data}_30'))
         keyboard.add(InlineKeyboardButton(text=f'{cb_text} 1 час', callback_data=f'{cb_data}_60'))
@@ -170,7 +170,27 @@ def restaurant_callback(call):
         BOT.send_message(chat_id=service_uid, text=text, reply_markup=keyboard)
         write_history(call.message.id, call.from_user.id, text, True)
 
-    print(data)
+    def delivery_time_change():
+        text = f'Укажите только адрес доставки для ресторана {rest_name}'
+        BOT.send_message(text=text, chat_id=call.from_user.id)
+        write_history(call.message.id, call.from_user.id, text, True)
+
+    def delivery_time_rest():
+        service_uid = Restaurant.query.filter_by(id=rest_id).first().service_uid
+        user = User.query.filter_by(uid=call.from_user.id).first()
+        text_user = f'К сожалению, ресторан {rest_name} не сможет осуществить доставку на указанный адрес'
+        text_rest = 'Мы оповестили клиента о невозможности осуществления доставки на указанный адрес'
+        if data[9] != 'no':
+            time = int(data[9])
+            text_user = f'Ответ ресторана {rest_name}: примерное время доставки '
+            answers = {30: f'{time} минут', 60: '1 час', 90: '1 час и 30 минут'}
+            default = f'{time // 60} часа'
+            time_text = answers.get(time, default)
+            text_user += time_text + f' на адрес {user.address}'
+            text_rest = f'Мы оповестили клиента, что можем доставить за {time_text} на адрес {user.address}'
+        BOT.send_message(chat_id=call.from_user.id, text=text_user)
+        BOT.send_message(chat_id=service_uid, text=text_rest)
+
     options = {
         2: categories_menu,
         3: categories_menu,
@@ -179,6 +199,8 @@ def restaurant_callback(call):
         6: show_delivery_time,
         7: delivery_time_confirm,
         8: dish_change,
+        9: delivery_time_change,
+        10: delivery_time_rest
     }
     options.get(len(data))()
 
