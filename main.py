@@ -1,7 +1,6 @@
-from app import app, manager, sched
+from app import manager, sched
 import views
 import logging
-from apscheduler.schedulers.background import BackgroundScheduler
 
 logging.basicConfig()
 logging.getLogger('apscheduler').setLevel(logging.DEBUG)

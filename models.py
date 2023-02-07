@@ -2,6 +2,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app import db
 from datetime import datetime
+from flask_validator import ValidateEmail
 
 
 class Restaurant(db.Model):
@@ -12,6 +13,13 @@ class Restaurant(db.Model):
     contact = db.Column(db.Text(), nullable=False)
     passwd = db.Column(db.Text())
     service_uid = db.Column(db.Integer())
+    email = db.Column(db.Text())
+    min_total = db.Column(db.Integer(), default=0)
+    enabled = db.Column(db.Boolean(), default=True)
+
+    @classmethod
+    def __declare_last__(cls):
+        ValidateEmail(Restaurant.email, True, True, "Почта указана некорректно")
 
 
 class Category(db.Model):
@@ -19,6 +27,13 @@ class Category(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.Text(), nullable=False)
     restaurant_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+
+
+class Subcategory(db.Model):
+    __tablename__ = 'subcategories'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.Text(), nullable=False)
+    category_id = db.Column(db.Integer(), db.ForeignKey('categories.id'))
 
 
 class Dish(db.Model):
@@ -30,6 +45,30 @@ class Dish(db.Model):
     img_link = db.Column(db.Text(), nullable=False)
     category = db.Column(db.Text(), db.ForeignKey('categories.name'))
     id_rest = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+
+
+class SpecialDish(db.Model):
+    __tablename__ = 'special_dishes'
+    id = db.Column(db.Integer(), primary_key=True)
+    subcat_id = db.Column(db.Integer(), nullable=False)
+    dish_id = db.Column(db.Integer(), nullable=False)
+    category_id = db.Column(db.Integer(), nullable=False)
+    rest_id = db.Column(db.Integer(), nullable=False)
+
+
+class PromoDish(db.Model):
+    __tablename__ = 'promo_dishes'
+    id = db.Column(db.Integer(), primary_key=True)
+    img_link = db.Column(db.Text(), nullable=False)
+    rest_id = db.Column(db.Integer(), nullable=False)
+
+
+class Favorites(db.Model):
+    __tablename__ = 'favorites'
+    id = db.Column(db.Integer(), primary_key=True)
+    uid = db.Column(db.Integer(), nullable=False)
+    dish_id = db.Column(db.Integer(), nullable=False)
+    rest_id = db.Column(db.Integer(), nullable=False)
 
 
 class Cart(db.Model):
@@ -67,7 +106,7 @@ class Order(db.Model):
     order_rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
     order_datetime = db.Column(db.Integer())
     order_confirm = db.Column(db.Boolean(), default=False)
-    order_state = db.Column(db.Text(), default='Собран')
+    order_state = db.Column(db.Text())
 
 
 class OrderDetail(db.Model):
@@ -93,11 +132,12 @@ class History(db.Model):
 
 
 class Admin(db.Model, UserMixin):
+    """Admin model"""
     __tablename__ = 'admins'
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(100))
     username = db.Column(db.String(50), nullable=False, unique=True)
-    email = db.Column(db.String(100), nullable=False, unique=True)
+    email = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(100), nullable=False)
     created_on = db.Column(db.DateTime(), default=datetime.now)
     updated_on = db.Column(db.DateTime(), default=datetime.now, onupdate=datetime.now)
@@ -124,3 +164,21 @@ class RestaurantDeliveryTerms(db.Model):
     rest_ogrn = db.Column(db.Integer())
     rest_fullname = db.Column(db.String())
     rest_address = db.Column(db.String())
+
+
+class SearchWords(db.Model):
+    __tablename__ = 'search_words'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String())
+    words = db.Column(db.String())
+    # search_dish_id = db.Column(db.Integer(), db.ForeignKey('search_dishes.id'))
+
+
+class SearchDishes(db.Model):
+    __tablename__ = 'search_dishes'
+    id = db.Column(db.Integer(), primary_key=True)
+    dish_id = db.Column(db.Integer(), db.ForeignKey('dishes.id'))
+    dish_name = db.Column(db.String(), db.ForeignKey('dishes.name'))
+    dish_category = db.Column(db.String(), db.ForeignKey('categories.name'))
+    rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+    search_words_id = db.Column(db.Integer(), db.ForeignKey('search_words.id'))
