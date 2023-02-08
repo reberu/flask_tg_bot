@@ -69,7 +69,6 @@ def restaurant_callback(call):
         cart_item = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
         dish_count = cart_item.quantity if cart_item else 0
         if data[6] == 'add' and dish_count == 0:
-            print('add when count 0')
             new_item = Cart(
                 name=dish.name,
                 price=dish.cost,
@@ -84,22 +83,17 @@ def restaurant_callback(call):
             db.session.add(new_item)
             db.session.commit()
         elif data[6] == 'add' or 'rem' and dish_count > 1:
-            print('add/rem when count > 1')
             cart_item.quantity += operation.get(data[6])
             db.session.commit()
         elif data[6] == 'rem' and dish_count == 0:
-            print('rem when 0')
             return 'Ok', 200
         elif data[6] == 'rem' and dish_count == 1:
-            print('rem when 1')
             Cart.query.filter_by(id=cart_item.id).delete()
             db.session.commit()
         dish_count = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
         dish_count = dish_count.quantity if dish_count else 0
-        print(dish_count)
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         total = total[0][0] if total[0][0] else 0
-        print(total)
         text = f'{rest_name}\n'
         text += f'<a href="{dish.img_link}">.</a>'
         text += f'\n<b>{dish.name}</b>'
@@ -116,7 +110,6 @@ def restaurant_callback(call):
         )
         keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu'))
         keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
-        print('bot sendmsg')
         BOT.edit_message_text(
             chat_id=call.from_user.id,
             text=text,
@@ -207,6 +200,32 @@ def restaurant_callback(call):
 
 def cart_callback(call):
     print('cart callback', call.data)
+    cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
+    rest = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
+
+    def cart_confirm():
+        total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+        total = total[0][0] if total[0][0] else 0
+        keyboard = InlineKeyboardMarkup()
+        text = 'Выберите вариант:'
+        first_button = InlineKeyboardButton(text='Доставка', callback_data='cart_confirm_delivery')
+        second_button = InlineKeyboardButton(text='Самовывоз', callback_data='cart_confirm_takeaway')
+        if rest.min_total or total < rest.min_total:
+            text = f'Минимальная сумма заказа должна быть не менее {rest.min_total}'
+            first_button = InlineKeyboardButton(text='Меню', callback_data=f'restaurant_{rest.id}')
+            second_button = InlineKeyboardButton(text='Корзина', callback_data='cart')
+        keyboard.add(first_button, second_button)
+        BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
+
+    def cart_options():
+        pass
+
+    options = {
+        2: cart_confirm,
+        3: None,
+        4: None,
+        5: None
+    }
 
 
 def order_callback(call):
@@ -239,9 +258,16 @@ def other_callback(call):
             parse_mode='HTML'
         )
 
+    def cart_purge(data):
+        Cart.query.filter_by(user_uid=data.from_user.id).delete()
+        db.session.commit()
+        text = 'Ваша корзина пуста'
+        BOT.edit_message_text(chat_id=data.from_user.id, message_id=data.message.id, text=text)
+
     options = {
         'back_to_rest_kb': back_to_rest,
         'back_to_rest_promo': back_to_rest_promo,
+        'purge': cart_purge
     }
 
     options.get(call.data)(call)
