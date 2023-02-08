@@ -200,6 +200,7 @@ def restaurant_callback(call):
 
 def cart_callback(call):
     print('cart callback', call.data)
+    data = call.data.split('_')
     cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
     rest = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
 
@@ -218,14 +219,38 @@ def cart_callback(call):
         BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
 
     def cart_options():
-        pass
+        user = User.query.filter_by(uid=call.from_user.id).first()
+        option = call.data.split('_')[2]
+
+        def delivery():
+            try:
+                text = f"Вы укалази:\nАдрес доставки: {user.address}\nКонтактный номер: {user.phone}"
+                keyboard = InlineKeyboardMarkup()
+                keyboard.add(InlineKeyboardButton(text='Отправить', callback_data='order_confirm'))
+                keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data='cart_confirm_change'))
+                BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
+            except AttributeError:
+                text = 'Укажите адрес доставки. Улица, дом, кв, подъезд:'
+                BOT.send_message(text=text, chat_id=call.from_user.id)
+            write_history(call.message.id, call.from_user.id, text, True)
+
+        opts = {
+            'change': 'Укажите адрес доставки. Улица, дом, кв, подъезд:',
+            'takeaway': 'Напишите во сколько хотите забрать Ваш заказ ( в цифрах без букв)'
+        }
+        if option in opts:
+            BOT.send_message(chat_id=call.from_user.id, text=opts.get(option))
+            write_history(call.message.id, call.from_user.id, opts.get(option), True)
+        else:
+            delivery()
 
     options = {
         2: cart_confirm,
-        3: None,
+        3: cart_options,
         4: None,
         5: None
     }
+    options.get(len(data))()
 
 
 def order_callback(call):
@@ -267,7 +292,8 @@ def other_callback(call):
     options = {
         'back_to_rest_kb': back_to_rest,
         'back_to_rest_promo': back_to_rest_promo,
-        'purge': cart_purge
+        'purge': cart_purge,
+        'to_rest': None
     }
 
     options.get(call.data)(call)
