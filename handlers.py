@@ -110,6 +110,7 @@ def restaurant_callback(call):
         )
         keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu'))
         keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
+        print(keyboard)
         BOT.edit_message_text(
             chat_id=call.from_user.id,
             text=text,
@@ -254,7 +255,8 @@ def cart_callback(call):
         row = [InlineKeyboardButton(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in enumerate(cart, start=1)]
         row.insert(0, InlineKeyboardButton(text='❌', callback_data=f'cart_id_{item_id}_clear'))
         dish = Dish.query.filter_by(id=cart_item.dish_id).first()
-        text += f'<a href="{dish.img_link}">{rest}</a>\n{dish.name}\n{dish.composition}\n{dish.cost}'
+        text += f'<a href="{dish.img_link}">{rest.name}</a>\n{dish.name}\n{dish.composition}\n{dish.cost}'
+        print(text)
         keyboard.row(*row)
         row = [
             InlineKeyboardButton(text='-', callback_data=f'cart_id_{item_id}_remove'),
@@ -263,12 +265,22 @@ def cart_callback(call):
         ]
         keyboard.row(*row)
         row = [
-            InlineKeyboardButton(text='Очистить', callback_data=f'purge'),
+            InlineKeyboardButton(text='Очистить', callback_data='purge'),
             InlineKeyboardButton(text='Меню', callback_data=f'restaurant_{cart_item.restaurant_id}')
         ]
         keyboard.row(*row)
         keyboard.add(InlineKeyboardButton(text=f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
-        BOT.edit_message_text(text=text, chat_id=call.from_user.id, message_id=call.message.id, reply_markup=keyboard, parse_mode='HTML')
+        print(call.message.id)
+        try:
+            BOT.edit_message_text(
+                chat_id=call.from_user.id,
+                text=text,
+                message_id=call.message.id,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            print(e)
 
     options = {
         2: cart_confirm,
