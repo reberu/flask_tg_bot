@@ -213,9 +213,9 @@ def show_cart(message):
     total = 0
     cart_count = db.session.query(Cart.quantity).filter(Cart.id == cart[0].id).first()[0]
     text = '<b>Корзина</b>\n'
-    row = [InlineKeyboardButton(text='❌', callback_data=f'cart_id_{cart[0].id}_clear')]
+    row = [InlineKeyboardButton(text='❌', callback_data=f'cart_item_id_{cart[0].id}_clear')]
     for i, item in enumerate(cart, start=1):
-        row.append(InlineKeyboardButton(text=str(i), callback_data=f'cart_id_{item.id}'))
+        row.append(InlineKeyboardButton(text=str(i), callback_data=f'cart_item_id_{item.id}'))
         total += item.price * item.quantity
     keyboard.row(*row)
     cart_dish_id = None if not cart else db.session.query(Cart.dish_id).filter(Cart.id == cart[0].id).first()[0]

@@ -244,10 +244,36 @@ def cart_callback(call):
         else:
             delivery()
 
+    def cart_carousel():
+        item_id = int(data[3])
+        cart_item = Cart.query.filter_by(id=item_id).first()
+        keyboard = InlineKeyboardMarkup()
+        total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+        total = total[0][0] if total[0][0] else 0
+        text = '<b>Корзина</b>\n'
+        row = [InlineKeyboardButton(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in enumerate(cart, start=1)]
+        row.insert(0, InlineKeyboardButton(text='❌', callback_data=f'cart_id_{item_id}_clear'))
+        dish = Dish.query.filter_by(id=cart_item.dish_id).first()
+        text += f'<a href="{dish.img_link}">{rest}</a>\n{dish.name}\n{dish.composition}\n{dish.cost}'
+        keyboard.row(*row)
+        row = [
+            InlineKeyboardButton(text='-', callback_data=f'cart_id_{item_id}_remove'),
+            InlineKeyboardButton(text=f'{cart_item.quantity} шт', callback_data='None'),
+            InlineKeyboardButton(text='+', callback_data=f'cart_id_{item_id}_add')
+        ]
+        keyboard.row(*row)
+        row = [
+            InlineKeyboardButton(text='Очистить', callback_data=f'purge'),
+            InlineKeyboardButton(text='Меню', callback_data=f'restaurant_{cart_item.restaurant_id}')
+        ]
+        keyboard.row(*row)
+        keyboard.add(InlineKeyboardButton(text=f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
+        BOT.edit_message_text(text=text, chat_id=call.from_user.id, message_id=call.message.id, reply_markup=keyboard, parse_mode='HTML')
+
     options = {
         2: cart_confirm,
         3: cart_options,
-        4: None,
+        4: cart_carousel,
         5: None
     }
     options.get(len(data))()
