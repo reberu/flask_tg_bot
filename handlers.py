@@ -110,7 +110,6 @@ def restaurant_callback(call):
         )
         keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu'))
         keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
-        print(keyboard)
         BOT.edit_message_text(
             chat_id=call.from_user.id,
             text=text,
@@ -219,7 +218,7 @@ def cart_callback(call):
         keyboard.add(first_button, second_button)
         BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
 
-    def cart_options():
+    def cart_confirm_options():
         user = User.query.filter_by(uid=call.from_user.id).first()
         option = call.data.split('_')[2]
 
@@ -246,22 +245,28 @@ def cart_callback(call):
             delivery()
 
     def cart_carousel():
+        cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
+        if not cart:
+            text = 'Ваша корзина пуста'
+            BOT.send_message(chat_id=call.from_user.id, text=text)
+            return 'Ok', 200
         item_id = int(data[3])
         cart_item = Cart.query.filter_by(id=item_id).first()
+        cart_item = cart_item if cart_item else cart[0]
+        item_id = cart_item.id
         keyboard = InlineKeyboardMarkup()
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         total = total[0][0] if total[0][0] else 0
         text = '<b>Корзина</b>\n'
         row = [InlineKeyboardButton(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in enumerate(cart, start=1)]
-        row.insert(0, InlineKeyboardButton(text='❌', callback_data=f'cart_id_{item_id}_clear'))
+        row.insert(0, InlineKeyboardButton(text='❌', callback_data=f'cart_item_id_{item_id}_clear'))
         dish = Dish.query.filter_by(id=cart_item.dish_id).first()
         text += f'<a href="{dish.img_link}">{rest.name}</a>\n{dish.name}\n{dish.composition}\n{dish.cost}'
-        print(text)
         keyboard.row(*row)
         row = [
-            InlineKeyboardButton(text='-', callback_data=f'cart_id_{item_id}_remove'),
+            InlineKeyboardButton(text='-', callback_data=f'cart_item_id_{item_id}_remove'),
             InlineKeyboardButton(text=f'{cart_item.quantity} шт', callback_data='None'),
-            InlineKeyboardButton(text='+', callback_data=f'cart_id_{item_id}_add')
+            InlineKeyboardButton(text='+', callback_data=f'cart_item_id_{item_id}_add')
         ]
         keyboard.row(*row)
         row = [
@@ -270,23 +275,36 @@ def cart_callback(call):
         ]
         keyboard.row(*row)
         keyboard.add(InlineKeyboardButton(text=f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
-        print(call.message.id)
-        try:
-            BOT.edit_message_text(
-                chat_id=call.from_user.id,
-                text=text,
-                message_id=call.message.id,
-                reply_markup=keyboard,
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            print(e)
+        BOT.edit_message_text(
+            chat_id=call.from_user.id,
+            text=text,
+            message_id=call.message.id,
+            reply_markup=keyboard,
+            parse_mode='HTML'
+        )
+
+    def cart_item_actions():
+        operation = {'add': 1, 'remove': -1}
+        item_id = int(data[3])
+        item = Cart.query.filter_by(id=item_id).first()
+        if data[4] in operation:
+            item.quantity += operation.get(data[4])
+            db.session.commit()
+        elif data[4] == 'clear':
+            Cart.query.filter_by(id=item.id).delete()
+            db.session.commit()
+        else:
+            return 'Ok', 200
+        if item.quantity == 0:
+            Cart.query.filter_by(id=item.id).delete()
+            db.session.commit()
+        cart_carousel()
 
     options = {
         2: cart_confirm,
-        3: cart_options,
+        3: cart_confirm_options,
         4: cart_carousel,
-        5: None
+        5: cart_item_actions
     }
     options.get(len(data))()
 

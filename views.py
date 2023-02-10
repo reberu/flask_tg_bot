@@ -198,7 +198,6 @@ def promotions(message):
 
 @BOT.message_handler(commands=['show_cart'])
 def show_cart(message):
-    print(type(message))
     if type(message) is telebot.types.CallbackQuery:
         chat_id = message.from_user.id
     else:
@@ -220,16 +219,14 @@ def show_cart(message):
     keyboard.row(*row)
     cart_dish_id = None if not cart else db.session.query(Cart.dish_id).filter(Cart.id == cart[0].id).first()[0]
     current_dish = Dish.query.filter_by(id=cart_dish_id).first()
-    text += f'<a href="{current_dish.img_link}">{rest}</a>'
-    text += f'\n{current_dish.composition}'
-    text += f'\n{cart[0].price}'
+    text += f'<a href="{current_dish.img_link}">{rest}</a>\n{current_dish.name}\n{current_dish.composition}\n{cart[0].price}'
     keyboard.row(
-        InlineKeyboardButton('-️', callback_data=f'cart_id_{cart[0].id}_remove'),
+        InlineKeyboardButton('-️', callback_data=f'cart_item_id_{cart[0].id}_remove'),
         InlineKeyboardButton(f'{cart_count} шт.', callback_data='None'),
-        InlineKeyboardButton('+️', callback_data=f'cart_id_{cart[0].id}_add')
+        InlineKeyboardButton('+️', callback_data=f'cart_item_id_{cart[0].id}_add')
     )
     keyboard.row(
-        InlineKeyboardButton('Очистить️', callback_data=f'cart_purge'),
+        InlineKeyboardButton('Очистить️', callback_data=f'purge'),
         InlineKeyboardButton('Меню️️', callback_data=f'restaurant_{cart[0].restaurant_id}')
     )
     keyboard.add(InlineKeyboardButton(f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
