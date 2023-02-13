@@ -314,7 +314,9 @@ def cart_callback(call):
 
 def order_callback(call):
     print('order callback', call.data)
-    if call.data == 'order_confirm':
+    data = len(call.data)
+
+    def order_confirm():
         cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
         rest = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
@@ -364,6 +366,17 @@ def order_callback(call):
         BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
         write_history(call.message.id, call.from_user.id, text, True)
         send_email(rest.email, f'Поступил заказ из Robofood № {new_order.id}', text)
+
+    def order_confirm_change_actions():
+        action = call.data.split('_')[3]
+        text = 'Напишите во сколько хотите забрать Ваш заказ.'
+        if action == 'phone':
+            text = 'Укажите номер телефона для самовывоза:'
+        BOT.send_message(chat_id=call.from_user.id, text=text)
+        write_history(call.message.id, call.from_user.id, text, True)
+
+    actions = {2: order_confirm, 6: order_confirm_change_actions}
+    actions.get(data)()
 
 
 def other_callback(call):
