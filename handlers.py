@@ -3,7 +3,8 @@ from datetime import datetime
 from sqlalchemy import func
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from app import db, send_email
-from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, OrderDetail
+from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order
+from models import OrderDetail as OD
 from settings import BOT, YKT
 from utils import rest_menu_keyboard, write_history
 
@@ -314,7 +315,7 @@ def cart_callback(call):
 
 def order_callback(call):
     print('order callback', call.data)
-    data = len(call.data)
+    data = call.data.split('_')
 
     def order_confirm():
         cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
@@ -341,7 +342,7 @@ def order_callback(call):
         user = User.query.filter_by(uid=new_order.uid).first()
         text = f'Поступил заказ № {new_order.id}\nСостав заказа:\n'
         for item in cart:
-            db.session.add(OrderDetail(
+            db.session.add(OD(
                 order_id=new_order.id,
                 order_dish_name=item.name,
                 order_dish_cost=item.price,
@@ -376,8 +377,31 @@ def order_callback(call):
         write_history(call.message.id, call.from_user.id, text, True)
 
     actions = {2: order_confirm, 6: order_confirm_change_actions}
-    actions.get(data)()
+    actions.get(len(data))()
 
+    if call.data[3] == 'confirm':
+        order = Order.query.filter_by(id=int(data[1])).first()
+        details = OD.query.filter_by(order_id=order.id).all()
+        total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(order_id=order.id).all()
+        total = total[0][0] if total[0][0] else 0
+        rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
+        text = f'Заказ отправлен ждите ответа ресторана {rest.name}. За статусом заказа смотрите в "Мои ' \
+               f'заказы" в разделе Справка.'
+        order.order_state = 'Заказ отправлен, ожидание ответа ресторана'
+        BOT.send_message(chat_id=call.from_user.id, text=text)
+        text = f'Поступил заказ № {order.id}\nСостав заказа:\n'
+        text += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
+        text += f'Общая сумма заказа: {total} р.\n'
+        text += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=call.from_user.id).first()[0]}'
+        keyboard = InlineKeyboardMarkup()
+        bt_text = "Принять и доставить "
+        opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
+        for i in opts:
+            keyboard.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
+        keyboard.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
+        keyboard.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_change_{order.id}'))
+        db.session.commit()
+        BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
 
 def other_callback(call):
     print('other callback')
