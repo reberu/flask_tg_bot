@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from sqlalchemy import func
@@ -16,24 +17,23 @@ def restaurant_callback(call):
     rest_name = Restaurant.query.filter_by(id=rest_id).first().name
 
     def categories_menu():
-        keyboard = InlineKeyboardMarkup()
+        kbd = InlineKeyboardMarkup()
         for category in categories.all():
-            keyboard.add(
-                InlineKeyboardButton(text=category.name, callback_data=f'restaurant_{rest_id}_cat_{category.id}'))
+            kbd.add(InlineKeyboardButton(text=category.name, callback_data=f'restaurant_{rest_id}_cat_{category.id}'))
         cb_data = f'restaurant_{rest_id}_delivery_time_call_back'
-        keyboard.add(InlineKeyboardButton(text='Узнать время доставки', callback_data=cb_data))
+        kbd.add(InlineKeyboardButton(text='Узнать время доставки', callback_data=cb_data))
         cb_data = f'restaurant_{rest_id}_delivery_terms_show'
-        keyboard.add(InlineKeyboardButton('Условия доставки', callback_data=cb_data))
+        kbd.add(InlineKeyboardButton('Условия доставки', callback_data=cb_data))
         text = f'Меню ресторана {rest_name}. В некоторых случаях доставка платная, районы и стоимость ' \
                'смотрите в "Условия доставки " в списке меню Ресторана.'
         if 'from_promo' not in call.data:
             cb_data = 'back_to_rest_kb'
-            keyboard.add(InlineKeyboardButton(text='Назад', callback_data=cb_data))
+            kbd.add(InlineKeyboardButton(text='Назад', callback_data=cb_data))
         if 'menu' in call.data:
-            BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=keyboard)
+            BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=kbd)
         else:
             BOT.edit_message_text(text=text, chat_id=call.from_user.id, message_id=call.message.message_id,
-                                  reply_markup=keyboard)
+                                  reply_markup=kbd)
 
     def show_dishes():
         text = 'Если отключены автозагрузки фотографий для удобства просмотра блюд включите в ' \
@@ -47,18 +47,17 @@ def restaurant_callback(call):
         total = total[0][0] if total[0][0] else 0
         for dish in dishes:
             keyboard = InlineKeyboardMarkup()
-            text = f'{rest_name}\n<a href="{dish.img_link}">.</a>'
-            text += f'\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost}'
+            text = f'{rest_name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost}'
             dish_count = db.session.query(Cart.quantity).filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
             dish_count = dish_count[0] if dish_count else 0
             cb_first = f'restaurant_{rest_id}_cat_{category_id}_dish_{dish.id}'
             cb_last = f'{call.from_user.id}'
             cb_fav = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
             keyboard.row(
-                InlineKeyboardButton('⭐️', callback_data=cb_fav),
-                InlineKeyboardButton('-', callback_data=f'{cb_first}_rem_{cb_last}'),
-                InlineKeyboardButton(f'{dish_count} шт', callback_data='None'),
-                InlineKeyboardButton('+️', callback_data=f'{cb_first}_add_{cb_last}')
+                InlineKeyboardButton(text='⭐️', callback_data=cb_fav),
+                InlineKeyboardButton(text='-', callback_data=f'{cb_first}_rem_{cb_last}'),
+                InlineKeyboardButton(text=f'{dish_count} шт', callback_data='None'),
+                InlineKeyboardButton(text='+', callback_data=f'{cb_first}_add_{cb_last}')
             )
             keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu'))
             keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
@@ -73,14 +72,8 @@ def restaurant_callback(call):
         dish_count = cart_item.quantity if cart_item else 0
         if data[6] == 'add' and dish_count == 0:
             new_item = Cart(
-                name=dish.name,
-                price=dish.cost,
-                quantity=1,
-                user_uid=call.from_user.id,
-                is_dish=1,
-                is_water=0,
-                dish_id=dish.id,
-                restaurant_id=rest_id,
+                name=dish.name, price=dish.cost, quantity=1, user_uid=call.from_user.id,
+                is_dish=1, is_water=0, dish_id=dish.id, restaurant_id=rest_id,
                 service_uid=Restaurant.query.filter_by(id=rest_id).first().service_uid
             )
             db.session.add(new_item)
@@ -97,19 +90,15 @@ def restaurant_callback(call):
         dish_count = dish_count.quantity if dish_count else 0
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         total = total[0][0] if total[0][0] else 0
-        text = f'{rest_name}\n'
-        text += f'<a href="{dish.img_link}">.</a>'
-        text += f'\n<b>{dish.name}</b>'
-        text += f'\n{dish.composition}'
-        text += f'\n{dish.cost} р.'
+        text = f'{rest_name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost} р.'
         cb_first = f'restaurant_{rest_id}_cat_{int(data[3])}_dish_{dish.id}'
         cb_last = f'{call.from_user.id}'
         cb_data = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
         keyboard.row(
-            InlineKeyboardButton('⭐️', callback_data=cb_data),
-            InlineKeyboardButton('-️', callback_data=f'{cb_first}_rem_{cb_last}'),
-            InlineKeyboardButton(f'{dish_count} шт', callback_data='None'),
-            InlineKeyboardButton('+️', callback_data=f'{cb_first}_add_{cb_last}')
+            InlineKeyboardButton(text='⭐️', callback_data=cb_data),
+            InlineKeyboardButton(text='-', callback_data=f'{cb_first}_rem_{cb_last}'),
+            InlineKeyboardButton(text=f'{dish_count} шт', callback_data='None'),
+            InlineKeyboardButton(text='+', callback_data=f'{cb_first}_add_{cb_last}')
         )
         keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'restaurant_{rest_id}_menu'))
         keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
@@ -157,11 +146,9 @@ def restaurant_callback(call):
         cb_text_no = 'Не можем доставить на этот адрес'
         cb_data = f'restaurant_{rest_id}_uid_{user.uid}_delivery_time_callback_time_count'
         keyboard = InlineKeyboardMarkup()
-        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 30 минут', callback_data=f'{cb_data}_30'))
-        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 1 час', callback_data=f'{cb_data}_60'))
-        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 1 час 30 минут', callback_data=f'{cb_data}_90'))
-        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 2 часа', callback_data=f'{cb_data}_120'))
-        keyboard.add(InlineKeyboardButton(text=f'{cb_text} 3 часа', callback_data=f'{cb_data}_180'))
+        opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
+        for i in opts:
+            keyboard.add(InlineKeyboardButton(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
         keyboard.add(InlineKeyboardButton(text=cb_text_no, callback_data=f'{cb_data}_no'))
         BOT.send_message(chat_id=service_uid, text=text, reply_markup=keyboard)
         write_history(call.message.id, call.from_user.id, text, True)
@@ -353,7 +340,7 @@ def order_callback(call):
             txt += f'{item.name} - {item.quantity} шт.\n'
         txt += f'Общая сумма заказа: {summ} р.\n'
         bt_label = "Принять и доставить "
-        cb_data = f'order_change_{new_order.id}'
+        cb_data = f'order_{new_order.id}_change'
         txt += f'Адрес доставки {user.address}\nПерейдите в чат-бот, чтобы обработать заказ https://t.me/robofood1bot'
         kbd = InlineKeyboardMarkup()
         d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
@@ -382,16 +369,13 @@ def order_callback(call):
         if data[3] == 'confirm':
             user_id = call.from_user.id
             details = OD.query.filter_by(order_id=order.id).all()
-            total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(
-                order_id=order.id).all()
-            total = total[0][0] if total[0][0] else 0
             txt = f'Заказ отправлен ждите ответа ресторана {rest.name}. За статусом заказа смотрите в "Мои ' \
                    f'заказы" в разделе Справка.'
             order.order_state = 'Заказ отправлен, ожидание ответа ресторана'
             BOT.send_message(chat_id=user_id, text=txt)
             txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
-            txt += f'Общая сумма заказа: {total} р.\n'
+            txt += f'Общая сумма заказа: {order.order_total} р.\n'
             txt += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=user_id).first()[0]}'
             kbd = InlineKeyboardMarkup()
             bt_text = "Принять и доставить "
@@ -399,7 +383,7 @@ def order_callback(call):
             for i in opts:
                 keyboard.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
             keyboard.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
-            keyboard.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_change_{order.id}'))
+            keyboard.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
             user_id = rest.service_uid
             db.session.commit()
         elif data[3] == 'cancel':
@@ -483,7 +467,62 @@ def order_callback(call):
                 txt, kbd = None, None
         return user_id, txt, kbd
 
-    actions = {2: order_confirm, 4: order_quadruple_actions, 6: order_confirm_change_actions}
+    def order_quintuple_actions():
+        order = Order.query.filter_by(id=int(data[1])).first()
+        details = OD.query.filter_by(order_id=order.id).all()
+        user_id, txt, kbd = None, None, None
+        rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
+        total = db.session.query(func.sum(OD.order_dish_cost*OD.order_dish_quantity)).filter_by(order_id=order.id).all()
+        total = total[0][0] if total[0][0] else 0
+        if data[2] == 'confirm':
+            kbd = InlineKeyboardMarkup()
+            user_id = rest.service_uid
+            txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
+            txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
+            txt += f'Общая сумма заказа: {total} р.\nСамовывоз, время {data[4]}'
+            kbd.add(InlineKeyboardButton(text='Принять', callback_data=f'order_{order.id}_accept_0_{data[4]}'))
+            kbd.add(InlineKeyboardButton(text='Отменить', callback_data=f'order_{order.id}_change'))
+        elif data[2] == 'accept':
+            time = int(data[4])
+            pattern = r'(.[0-2][0-9]:[0-5][0-9](.*)[0-2][0-9]:[0-5][0-9])|' \
+                      r'(.[а-яА-Я][a-яА-Я]-[а-яА-Я][a-яА-Я].[0-2][0-9]:[0-5][0-9](.*)[0-2][0-9]:[0-5][0-9])'
+            rest_name = re.sub(pattern, '', rest.name)
+            answers = {30: f'{time} минут', 60: '1 часа', 90: '1 часа и 30 минут'}
+            default = f'{time // 60} часов'
+            time_txt = answers.get(time, default)
+            user_id = rest.service_uid
+            if time != 0:
+                txt = f'Ресторан {rest_name} принял ваш заказ № {order.id} и доставит в течении '
+                BOT.send_message(chat_id=user_id, text=txt+time_txt)
+                kbd = InlineKeyboardMarkup()
+                cb_text = 'Принять и доставить '
+                cb_data = f'order_{order.id}_accept'
+                opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
+                for i in opts:
+                    kbd.add(InlineKeyboardButton(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
+                cb_data = f'order_{order.id}_change'
+                kbd.add(InlineKeyboardButton(text=f'Принят на доставку в течении {time_txt}', callback_data='None'))
+                kbd.add(InlineKeyboardButton(text=f'Изменить заказ № {order.id}', callback_data=cb_data))
+            state = 'самовывоз' if time == 0 else 'доставка'
+            order.order_state = 'Заказ принят рестораном, ' + state
+            order.order_state += txt[53:] if time != 0 else ''
+            client = User.query.filter_by(uid=order.uid).first()
+            txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
+            txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
+            txt += f'Общая сумма заказа: {order.order_total} р.\n'
+            txt += f'Адрес доставки: {client.address}' if time != 0 else f'Самовывоз, {time_txt}'
+            BOT.edit_message_text(text=txt, chat_id=user_id, message_id=call.message.id, reply_markup=kbd)
+            txt = f'Мы оповестили клиента, что Вы приняли заказ № {order.id}'
+            txt += f', доставка {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз, {time_txt}'
+            txt += f'Контактный номер: {client.phone}'
+            kbd = None
+            db.session.commit()
+
+        return user_id, txt, kbd
+
+    actions = {
+        2: order_confirm, 4: order_quadruple_actions, 5: order_quintuple_actions, 6: order_confirm_change_actions
+    }
     uid, text, keyboard = actions.get(len(data))()
     BOT.send_message(chat_id=uid, text=text, reply_markup=keyboard, parse_mode='HTML')
     write_history(call.message.id, call.from_user.id, text, True)
