@@ -360,6 +360,51 @@ def order_callback(call):
         if action == 'phone':
             txt = 'Укажите номер телефона для самовывоза:'
         return call.from_user.id, txt, None
+
+    def order_triple_actions():
+        order = Order.query.filter_by(id=int(data[1])).first()
+        rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
+        details = OD.query.filter_by(order_id=order.id).all()
+        user_id, txt, kbd = None, None, InlineKeyboardMarkup()
+        if data[2] == 'change':
+            txt = f'Что хотите изменить в заказе № {order.id}?'
+            for item in details:
+                cb_txt = f'{item.order_dish_name}, {item.order_dish_quantity} шт.'
+                kbd.row(
+                    InlineKeyboardButton(text=cb_txt, callback_data='None'),
+                    InlineKeyboardButton(text='❌', callback_data=f'order_{order.id}_del_{item.id}')
+                )
+            kbd.add(InlineKeyboardButton(text='Назад', callback_data=f'order_{order.id}_menu'))
+            BOT.edit_message_text(text=txt, chat_id=rest.service_uid, message_id=call.message.id, reply_markup=kbd)
+            txt, kbd = None, None
+        elif data[2] == 'delivered':
+            kbd = None
+            order.order_state = 'Доставлен'
+            db.session.commit()
+            BOT.send_message(chat_id=order.uid, text='Доставка подтвеждена')
+        elif data[2] == 'menu':
+            user = User.query.filter_by(uid=order.uid).first()
+            txt = f'Клиент согласен с изменением заказа № {order.id}\nСостав заказа:\n'
+            txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
+            txt += f'Общая сумма заказа: {order.order_total} р.\nАдрес доставки: {user.address}'
+            bt_text = "Принять и доставить "
+            opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
+            for i in opts:
+                kbd.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
+            kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
+            kbd.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
+            user_id = rest.service_uid
+        elif data[2] == 'send2user':
+            BOT.send_message(text='Отправлен измененный заказ', chat_id=rest.service_uid)
+            txt = f'<b>В связи с отсутствием одного из блюд, ресторан {rest.name} изменил Ваш заказ</b>\n'
+            txt += 'Состав Вашего заказа:\n'
+            txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
+            txt += f'На общую сумму - {order.order_total} р.'
+            kbd.add(InlineKeyboardButton(text='Оформить заказ', callback_data=f'order_{order.id}_user_confirm'))
+            kbd.add(InlineKeyboardButton(text='Изменить заказ', callback_data=f'order_{order.id}_user_change'))
+            kbd.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'order_{order.id}_user_cancel'))
+            user_id = order.uid
+        return user_id, txt, kbd
     
     def order_quadruple_actions():
         order = Order.query.filter_by(id=int(data[1])).first()
@@ -381,9 +426,9 @@ def order_callback(call):
             bt_text = "Принять и доставить "
             opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
             for i in opts:
-                keyboard.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
-            keyboard.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
-            keyboard.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
+                kbd.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
+            kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
+            kbd.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
             user_id = rest.service_uid
             db.session.commit()
         elif data[3] == 'cancel':
@@ -448,7 +493,7 @@ def order_callback(call):
                     txt = f'Ресторан {rest.name} отменил заказ. В данное время нет работающих ресторанов'
                     markup = None
                 BOT.send_message(chat_id=user_id, text=txt, reply_markup=markup)
-                order.state = 'Заказ отменен'
+                order.order_state = 'Заказ отменен'
                 db.session.commit()
                 txt = 'Заказ отменен, клиенту направлено соответствующее сообщение'
                 user_id = rest.service_uid
@@ -521,7 +566,8 @@ def order_callback(call):
         return user_id, txt, kbd
 
     actions = {
-        2: order_confirm, 4: order_quadruple_actions, 5: order_quintuple_actions, 6: order_confirm_change_actions
+        2: order_confirm, 3: order_triple_actions, 4: order_quadruple_actions,
+        5: order_quintuple_actions, 6: order_confirm_change_actions
     }
     uid, text, keyboard = actions.get(len(data))()
     BOT.send_message(chat_id=uid, text=text, reply_markup=keyboard, parse_mode='HTML')
