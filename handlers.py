@@ -4,9 +4,9 @@ from datetime import datetime
 from sqlalchemy import func
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from app import db, send_email
-from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order
+from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites
 from models import OrderDetail as OD
-from settings import BOT, YKT
+from settings import BOT, YKT, RULES
 from utils import rest_menu_keyboard, write_history
 
 
@@ -574,6 +574,13 @@ def order_callback(call):
     write_history(call.message.id, call.from_user.id, text, True)
 
 
+def favorites_callback(call):
+    print('favorites callback', call.data)
+    data = call.data.split('_')
+    favs = Favorites.query.filter_by(uid=int(data[1]), rest_id=int(data[3])).all()
+    check = False
+
+
 def other_callback(call):
     print('other callback')
 
@@ -606,11 +613,17 @@ def other_callback(call):
         text = 'Ваша корзина пуста'
         BOT.edit_message_text(chat_id=data.from_user.id, message_id=data.message.id, text=text)
 
+    def other_callback(data):
+        pass
+
+    contract_url = 'https://telegra.ph/Polzovatelskoe-soglashenie-12-07-5'
     options = {
         'back_to_rest_kb': back_to_rest,
         'back_to_rest_promo': back_to_rest_promo,
         'purge': cart_purge,
-        'to_rest': None
+        'to_rest': None,
+        'show_contract': BOT.send_message(chat_id=call.from_user.id, text=contract_url, parse_mode='HTML'),
+        'show_rules': BOT.send_message(chat_id=call.from_user.id, text=RULES)
     }
 
     options.get(call.data)(call)

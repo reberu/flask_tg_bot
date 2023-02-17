@@ -8,7 +8,7 @@ from sqlalchemy.util import symbol
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, Update, WebAppInfo
 
-from handlers import restaurant_callback, cart_callback, order_callback, other_callback
+from handlers import restaurant_callback, cart_callback, order_callback, other_callback, favorites_callback
 from utils import check_user, write_history, rest_menu_keyboard
 
 from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantForm, CategoryDeleteForm, \
@@ -284,6 +284,7 @@ def callback_query(call):
         'restaurant': restaurant_callback,
         'cart': cart_callback,
         'order': order_callback,
+        'fav': favorites_callback
     }
     if call.data == 'cart':
         show_cart(call)
