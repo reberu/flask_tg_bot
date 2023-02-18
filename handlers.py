@@ -4,7 +4,8 @@ from datetime import datetime
 from sqlalchemy import func
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from app import db, send_email
-from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites
+from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites, \
+    SpecialDish
 from models import OrderDetail as OD
 from settings import BOT, YKT, RULES
 from utils import rest_menu_keyboard, write_history
@@ -323,7 +324,7 @@ def order_callback(call):
         )
         db.session.add(new_order)
         txt = f'Заказ отправлен, ждите ответа ресторана {rstrnt.name}.' \
-               'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
+              'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
         BOT.send_message(chat_id=call.from_user.id, text=txt)
         write_history(call.message.id, call.from_user.id, txt, True)
         user = User.query.filter_by(uid=new_order.uid).first()
@@ -345,7 +346,7 @@ def order_callback(call):
         kbd = InlineKeyboardMarkup()
         d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
         for item in d:
-            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30*item}'))
+            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}'))
         kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
         kbd.add(InlineKeyboardButton(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
         Cart.query.filter_by(user_uid=call.from_user.id).delete()
@@ -405,7 +406,7 @@ def order_callback(call):
             kbd.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'order_{order.id}_user_cancel'))
             user_id = order.uid
         return user_id, txt, kbd
-    
+
     def order_quadruple_actions():
         order = Order.query.filter_by(id=int(data[1])).first()
         details = OD.query.filter_by(order_id=order.id).all()
@@ -415,7 +416,7 @@ def order_callback(call):
             user_id = call.from_user.id
             details = OD.query.filter_by(order_id=order.id).all()
             txt = f'Заказ отправлен ждите ответа ресторана {rest.name}. За статусом заказа смотрите в "Мои ' \
-                   f'заказы" в разделе Справка.'
+                  f'заказы" в разделе Справка.'
             order.order_state = 'Заказ отправлен, ожидание ответа ресторана'
             BOT.send_message(chat_id=user_id, text=txt)
             txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
@@ -517,7 +518,8 @@ def order_callback(call):
         details = OD.query.filter_by(order_id=order.id).all()
         user_id, txt, kbd = None, None, None
         rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
-        total = db.session.query(func.sum(OD.order_dish_cost*OD.order_dish_quantity)).filter_by(order_id=order.id).all()
+        total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(
+            order_id=order.id).all()
         total = total[0][0] if total[0][0] else 0
         if data[2] == 'confirm':
             kbd = InlineKeyboardMarkup()
@@ -538,7 +540,7 @@ def order_callback(call):
             user_id = rest.service_uid
             if time != 0:
                 txt = f'Ресторан {rest_name} принял ваш заказ № {order.id} и доставит в течении '
-                BOT.send_message(chat_id=user_id, text=txt+time_txt)
+                BOT.send_message(chat_id=user_id, text=txt + time_txt)
                 kbd = InlineKeyboardMarkup()
                 cb_text = 'Принять и доставить '
                 cb_data = f'order_{order.id}_accept'
@@ -595,7 +597,6 @@ def favorites_callback(call):
             txt = f'{rest.name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost} р.'
             cart = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=item.dish_id, restaurant_id=rest_id).first()
             quantity = cart.quantity if cart else 0
-            cart = Cart.query.filter_by(user_uid=call.from_user.id, restaurant_id=rest_id).first()
             category_id = Category.query.filter_by(name=dish.category).first().id
             cb_data = f'fav_{call.from_user.id}_{rest_id}_{item.dish_id}'
             cb_data_first = f'restaurant_{rest_id}_cat_{category_id}_dish_{item.dish_id}'
@@ -646,16 +647,56 @@ def other_callback(call):
         BOT.edit_message_text(chat_id=data.from_user.id, message_id=data.message.id, text=text)
 
     def other(data):
-        pass
+        callback = data.data.split('_')
+        uid, text, kbd = data.from_user.id, None, None
+        if callback[0] == 'subcat':
+            kbd = InlineKeyboardMarkup()
+            subcat_id = int(callback[2])
+            query = db.session.query(
+                Restaurant.id, Restaurant.name, Dish.name, Dish.composition, Dish.cost, Dish.img_link, Dish.id,
+                SpecialDish.category_id).filter(SpecialDish.subcat_id == subcat_id,
+                                                SpecialDish.rest_id == Restaurant.id,
+                                                SpecialDish.dish_id == Dish.id).all()
+            for item in query:
+                text = f'<b>{item[1]}</b>\n{item[2]}\n{item[3]}\n{item[4]}\n<a href="{item[5]}">.</a>\n'
+                cart = Cart.query.filter_by(user_uid=uid, dish_id=item.dish_id, restaurant_id=item[0]).first()
+                quantity = cart.quantity if cart else 0
+                cb_data = f'fav_{uid}_{item[0]}_{item[6]}'
+                cb_data_first = f'restaurant_{item[0]}_cat_{item[7]}_dish_{item[6]}'
+                cb_data_last = f'{uid}_{data.message.id}'
+                kbd.row(
+                    InlineKeyboardButton(text='⭐️', callback_data=cb_data),
+                    InlineKeyboardButton(text='-', callback_data=f'{cb_data_first}_rem_{cb_data_last}'),
+                    InlineKeyboardButton(text=f'{quantity} шт', callback_data='None'),
+                    InlineKeyboardButton(text='+', callback_data=f'{cb_data_first}_add_{cb_data_last}')
+                )
+                total = db.session.query(func.sum(Cart.price*Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+                total = total[0][0] if total[0][0] else 0
+                kbd.add(InlineKeyboardButton(text=f'В корзину: заказ на сумму {total} р', callback_data='cart'))# BOT.send_message(chat_id=uid, text=text, parse_mode='HTML', reply_markup=kbd)
+        elif callback[0] == 'user':
+            order = Order.query.filter_by(uid=uid).order_by(Order.id.desc()).first()
+            text = 'У Вас пока нет оформленных заказов.'
+            if order:
+                details = OD.query.filter_by(order_id=order.id).all()
+                rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
+                date = datetime.fromtimestamp(order.order_datetime).strftime('%H:%M %d.%m.%Y')
+                text = f'Заказ № {order.id} от {date}\nСтатус: {order.order_state}\n'
+                if order.order_state != 'Заказ отменен':
+                    text += 'Состав заказа:\n'
+                    text += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
+                    text += f'Сумма - {order.order_total} р.\n\n'
+                text += f'Ресторан: {rest.name}\nАдрес: {rest.address}\nНомер телефона: {rest.contact}'
+        elif callback[1] == 'contract':
+            text = 'https://telegra.ph/Polzovatelskoe-soglashenie-12-07-5'
+        elif callback[1] == 'rules':
+            text = RULES
+        BOT.send_message(chat_id=uid, text=text, parse_mode='HTML' if kbd else None, reply_markup=kbd)
 
-    contract_url = 'https://telegra.ph/Polzovatelskoe-soglashenie-12-07-5'
     options = {
         'back_to_rest_kb': back_to_rest,
         'back_to_rest_promo': back_to_rest_promo,
         'purge': cart_purge,
-        'to_rest': None,
-        'show_contract': BOT.send_message(chat_id=call.from_user.id, text=contract_url, parse_mode='HTML'),
-        'show_rules': BOT.send_message(chat_id=call.from_user.id, text=RULES)
+        'to_rest': None
     }
 
-    options.get(call.data)(call)
+    options.get(call.data, other)(call)
