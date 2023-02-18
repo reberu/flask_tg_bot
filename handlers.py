@@ -576,9 +576,41 @@ def order_callback(call):
 
 def favorites_callback(call):
     print('favorites callback', call.data)
-    data = call.data.split('_')
-    favs = Favorites.query.filter_by(uid=int(data[1]), rest_id=int(data[3])).all()
-    check = False
+    data, txt = call.data.split('_'), ''
+    rest_id, dish_id = int(data[3]) if data[2] == 'rest' else int(data[2]), int(data[3])
+    favs = Favorites.query.filter_by(uid=int(data[1]), rest_id=rest_id).all()
+    if data[2] != 'rest':
+        txt = 'Блюдо удалено из избранного'
+        Favorites.query.filter_by(uid=call.from_user.id, dish_id=dish_id, rest_id=rest_id).delete()
+        if not favs:
+            db.session.add(Favorites(uid=call.from_user.id, dish_id=dish_id, rest_id=rest_id))
+            txt = 'Блюдо добавлено в избранное'
+        db.session.commit()
+        BOT.answer_callback_query(callback_query_id=call.id, show_alert=False, text=txt)
+    else:
+        kbd = InlineKeyboardMarkup()
+        for item in favs:
+            dish = Dish.query.filter_by(id=item.dish_id).first()
+            rest = Restaurant.query.filter_by(id=item.rest_id).first()
+            txt = f'{rest.name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost} р.'
+            cart = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=item.dish_id, restaurant_id=rest_id).first()
+            quantity = cart.quantity if cart else 0
+            cart = Cart.query.filter_by(user_uid=call.from_user.id, restaurant_id=rest_id).first()
+            category_id = Category.query.filter_by(name=dish.category).first().id
+            cb_data = f'fav_{call.from_user.id}_{rest_id}_{item.dish_id}'
+            cb_data_first = f'restaurant_{rest_id}_cat_{category_id}_dish_{item.dish_id}'
+            cb_data_last = f'{call.from_user.id}_{call.message.id}'
+            kbd.row(
+                InlineKeyboardButton(text='⭐️', callback_data=cb_data),
+                InlineKeyboardButton(text='-', callback_data=f'{cb_data_first}_rem_{cb_data_last}'),
+                InlineKeyboardButton(text=f'{quantity} шт', callback_data='None'),
+                InlineKeyboardButton(text='+', callback_data=f'{cb_data_first}_add_{cb_data_last}')
+            )
+            kbd.add(InlineKeyboardButton(text='Меню ресторана', callback_data=f'restaurant_{rest_id}'))
+            total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+            total = total[0][0] if total[0][0] else 0
+            kbd.add(InlineKeyboardButton(text=f'В корзину: заказ на сумму {total} р', callback_data='cart_confirm'))
+            BOT.send_message(chat_id=call.from_user.id, text=txt, parse_mode='HTML', reply_markup=kbd)
 
 
 def other_callback(call):
@@ -613,7 +645,7 @@ def other_callback(call):
         text = 'Ваша корзина пуста'
         BOT.edit_message_text(chat_id=data.from_user.id, message_id=data.message.id, text=text)
 
-    def other_callback(data):
+    def other(data):
         pass
 
     contract_url = 'https://telegra.ph/Polzovatelskoe-soglashenie-12-07-5'
