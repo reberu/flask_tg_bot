@@ -62,8 +62,8 @@ def rest_menu_keyboard():
 
             if is_time_between(start_time, end_time, current_time):
                 keyboard.add(
-                    types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}'))
+                    types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'rest_{restaurant.id}'))
         else:
             keyboard.add(
-                types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'restaurant_{restaurant.id}'))
+                types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'rest_{restaurant.id}'))
     return keyboard

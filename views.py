@@ -4,6 +4,7 @@ from itertools import chain
 import pytz
 import telebot.types
 from flask import render_template, flash, redirect, url_for, Response
+from sqlalchemy import func
 from sqlalchemy.util import symbol
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, Update, WebAppInfo
@@ -36,7 +37,6 @@ from werkzeug.utils import secure_filename
 from transliterate import translit
 
 requests.get(SET_WEBHOOK)
-# URL = f'https://api.telegram.org/bot{BOT_TOKEN}/'
 
 
 def webAppKeyboardInline():
@@ -188,20 +188,17 @@ def recommend(message):
 @BOT.message_handler(commands=['promotions'])
 def promotions(message):
     promo_dishes = PromoDish.query.all()
+    keyboard = InlineKeyboardMarkup()
     for dish in promo_dishes:
         text = f'<a href="{dish.img_link}">.</a>'
-        cb_data = f'restaurant_{dish.id_rest}'
-        keyboard = InlineKeyboardMarkup()
+        cb_data = f'restaurant_{dish.rest_id}'
         keyboard.add(InlineKeyboardButton(text="Меню ресторана", callback_data=cb_data))
         BOT.send_message(chat_id=message.chat.id, text=text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @BOT.message_handler(commands=['show_cart'])
 def show_cart(message):
-    if type(message) is telebot.types.CallbackQuery:
-        chat_id = message.from_user.id
-    else:
-        chat_id = message.chat.id
+    chat_id = message.from_user.id if type(message) is telebot.types.CallbackQuery else message.chat.id
     cart = Cart.query.filter_by(user_uid=chat_id).all()
     if not cart:
         text = 'Ваша корзина пуста'
@@ -209,13 +206,13 @@ def show_cart(message):
         return 'Ok', 200
     keyboard = InlineKeyboardMarkup()
     rest = db.session.query(Restaurant.name).filter_by(id=cart[0].restaurant_id).first()[0]
-    total = 0
+    total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=chat_id).all()
+    total = total[0][0] if total[0][0] else 0
     cart_count = db.session.query(Cart.quantity).filter(Cart.id == cart[0].id).first()[0]
     text = '<b>Корзина</b>\n'
     row = [InlineKeyboardButton(text='❌', callback_data=f'cart_item_id_{cart[0].id}_clear')]
     for i, item in enumerate(cart, start=1):
         row.append(InlineKeyboardButton(text=str(i), callback_data=f'cart_item_id_{item.id}'))
-        total += item.price * item.quantity
     keyboard.row(*row)
     cart_dish_id = None if not cart else db.session.query(Cart.dish_id).filter(Cart.id == cart[0].id).first()[0]
     current_dish = Dish.query.filter_by(id=cart_dish_id).first()
@@ -265,6 +262,8 @@ def send_help(message):
 @BOT.message_handler(content_types=["text"])
 def new_msg(message):
     """Обработка текстовых сообщений"""
+    if message == 'Укажите только адрес доставки для ресторана Суши Весла 11:00-23:00':
+        print('gotcha')
     options = {
         "Рестораны": rest_menu_send_msg,
         "Комбо Наборы (КБ)": combo,
@@ -273,6 +272,10 @@ def new_msg(message):
         "Корзина": show_cart,
         "Статистика": stat_menu_keyboard,
     }
+    try:
+        print(message.message_id)
+    except Exception as e:
+        print(e)
     options.get(message.text, default_message)(message)
 
 
@@ -281,7 +284,7 @@ def callback_query(call):
     """Обработка колбэков"""
     req = call.data.split('_')
     options = {
-        'restaurant': restaurant_callback,
+        'rest': restaurant_callback,
         'cart': cart_callback,
         'order': order_callback,
         'fav': favorites_callback
