@@ -241,15 +241,35 @@ def cart_callback(call):
                 BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
             except AttributeError:
                 text = 'Укажите адрес доставки. Улица, дом, кв, подъезд:'
-                BOT.send_message(text=text, chat_id=call.from_user.id)
+                mesg = BOT.send_message(text=text, chat_id=call.from_user.id)
+                BOT.register_next_step_handler(mesg, cart_delivery_address)
             write_history(call.message.id, call.from_user.id, text, True)
 
         opts = {
             'change': 'Укажите адрес доставки. Улица, дом, кв, подъезд:',
             'takeaway': 'Напишите во сколько хотите забрать Ваш заказ ( в цифрах без букв)'
         }
+
+        def cart_delivery_address(pair):
+            usr = User.query.filter_by(uid=pair.chat.id).first()
+            usr.address = pair.text
+            db.session.commit()
+            mesg = BOT.send_message(chat_id=pair.chat.id, text='Укажите номер телефона')
+            BOT.register_next_step_handler(mesg, cart_delivery_phone)
+
+        def cart_delivery_phone(pair):
+            usr = User.query.filter_by(uid=pair.chat.id).first()
+            usr.phone = pair.text
+            db.session.commit()
+            text = f'Вы указали:\nАдрес доставки: {usr.address}\nКонтактный номер: {usr.phone}'
+            keyboard = InlineKeyboardMarkup()
+            keyboard.add(InlineKeyboardButton(text='Отправить', callback_data='order_confirm'))
+            keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data='cart_confirm_change'))
+            BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=keyboard)
+
         if option in opts:
-            BOT.send_message(chat_id=call.from_user.id, text=opts.get(option))
+            msg = BOT.send_message(chat_id=call.from_user.id, text=opts.get(option))
+            BOT.register_next_step_handler(msg, cart_delivery_address)
             write_history(call.message.id, call.from_user.id, opts.get(option), True)
         else:
             delivery()
@@ -390,10 +410,8 @@ def order_callback(call):
             txt = f'Что хотите изменить в заказе № {order.id}?'
             for item in details:
                 cb_txt = f'{item.order_dish_name}, {item.order_dish_quantity} шт.'
-                kbd.row(
-                    InlineKeyboardButton(text=cb_txt, callback_data='None'),
-                    InlineKeyboardButton(text='❌', callback_data=f'order_{order.id}_del_{item.id}')
-                )
+                kbd.row(InlineKeyboardButton(text=cb_txt, callback_data='None'),
+                    InlineKeyboardButton(text='❌', callback_data=f'order_{order.id}_del_{item.id}'))
             kbd.add(InlineKeyboardButton(text='Назад', callback_data=f'order_{order.id}_menu'))
             BOT.edit_message_text(text=txt, chat_id=rest.service_uid, message_id=call.message.id, reply_markup=kbd)
             txt, kbd = None, None
