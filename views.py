@@ -1,17 +1,14 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from itertools import chain
 from os import mkdir
 from os.path import isdir
-from time import sleep
 
-import pytz
 import telebot.types
 from PIL import Image
-from flask import render_template, flash, redirect, url_for, Response
+from flask import render_template, flash, redirect, url_for
 from sqlalchemy import func
-from sqlalchemy.util import symbol
 
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, Update, WebAppInfo
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, Update
 from telebot.util import antiflood
 
 from handlers import restaurant_callback, cart_callback, order_callback, other_callback, favorites_callback
@@ -22,17 +19,16 @@ from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantF
     RestaurantDeliveryTermsEditForm, SubcategoryForm, SpecialDishForm, PromoDishForm, PromoDishDeleteForm, \
     SpecialDishDeleteForm, DishEditForm, SubcategoryDeleteForm, SearchWordForm, SearchDishForm, SearchDishDelForm, \
     SearchWordDelForm, DateForm, RestaurantsEnableForm
-from settings import BOT, BASE_URL, RULES, MONTHS, SET_WEBHOOK, YKT, ADMINS
+from settings import BOT, BASE_URL, SET_WEBHOOK, YKT, ADMINS
 from static.contract import contract_text
 
 import re
 import requests
-import json
 
 from flask import request
 from flask_login import login_required, login_user, current_user, logout_user
 
-from app import app, db, login_manager, send_email
+from app import app, db, login_manager
 
 from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin, \
     RestaurantDeliveryTerms, Subcategory, SpecialDish, PromoDish, Favorites, SearchWords, SearchDishes
@@ -42,14 +38,6 @@ from werkzeug.utils import secure_filename
 from transliterate import translit
 
 requests.get(SET_WEBHOOK)
-
-
-def webAppKeyboardInline():
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    webApp = WebAppInfo("https://telegram.mihailgok.ru")
-    one = InlineKeyboardButton(text="Веб приложение", web_app=webApp)
-    keyboard.add(one)
-    return keyboard
 
 
 def rest_menu_send_msg(chat_id):
@@ -126,6 +114,13 @@ def webhook():
     except AttributeError:
         pass
     return 'Ok', 200
+
+
+@BOT.message_handler(content_types=["web_app_data"])
+def webapp_callback(content):
+    print('web_app_data')
+    print(content)
+    print(content.web_app_data.data)
 
 
 @BOT.message_handler(commands=['start'])
@@ -331,6 +326,15 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/webapp', methods=['GET'])
+def webapp():
+    dishes = Dish.query.all()
+    categories = Category.query.all()
+    yesterday = int((date.today() + timedelta(days=-1)).strftime('%s'))
+    logs = History.query.filter(History.date >= yesterday).all()
+    return render_template('webapp.html', dishes=dishes, categories=categories, logs=logs)
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.query(Admin).get(user_id)
@@ -467,3 +471,446 @@ def send_message():
 @app.route('/contract/', methods=['GET'])
 def contract():
     return render_template('contract.html', contract_text=contract_text)
+
+
+@app.route('/admin', methods=['GET', 'POST'])
+@login_required
+def admin():
+    dishes = db.session.query(Dish).all()
+    s_dishes = SpecialDish.query.all()
+    search_dishes = SearchDishes.query.all()
+    search_words = SearchWords.query.all()
+    promo_dishes = PromoDish.query.all()
+    restaurants = db.session.query(Restaurant).all()
+    categories = db.session.query(Category).all()
+    subcategories = Subcategory.query.all()
+    promo_dishes_form = PromoDishForm()
+    promo_dishes_delete_form = PromoDishDeleteForm()
+    dish_delete_form = DishDeleteForm()
+    restaurant_form = RestaurantForm()
+    restaurant_delete_form = RestaurantDeleteForm()
+    restaurant_edit_form = RestaurantEditForm()
+    restaurant_enable_form = RestaurantsEnableForm()
+    admin_add_form = AdminAddForm()
+    delivery_terms = RestaurantDeliveryTerms.query.all()
+    rest_delivery_terms_form = RestaurantDeliveryTermsForm()
+    rest_delivery_terms_edit_form = RestaurantDeliveryTermsEditForm()
+    subcategory_add_form = SubcategoryForm()
+    subcategory_del_form = SubcategoryDeleteForm()
+    special_dish_form = SpecialDishForm()
+    special_dish_delete_form = SpecialDishDeleteForm()
+    dish_edit_form = DishEditForm()
+    search_word_form = SearchWordForm()
+    search_word_del_form = SearchWordDelForm()
+    search_dish_form = SearchDishForm()
+    search_dish_del_form = SearchDishDelForm()
+    if current_user.username != 'admin':
+        dish_form = DishForm(hide_rest=True)
+        category_form = CategoryForm(hide_rest_id=True)
+        category_delete_form = CategoryDeleteForm(hide_rest_id=True)
+    else:
+        dish_form = DishForm(hide_rest=False)
+        category_form = CategoryForm(hide_rest_id=False)
+        category_delete_form = CategoryDeleteForm(hide_rest_id=False)
+    if dish_form.dish_add_submit.data:
+        if dish_form.validate_on_submit() or dish_form.is_submitted():
+            name = dish_form.name.data
+            cost = dish_form.cost.data
+            composition = dish_form.composition.data
+            if current_user.ownership == 'all':
+                id_rest = request.form['dish_add_rest_selector']
+                category = request.form['dish_add_admin_category_selector']
+            else:
+                id_rest = dish_form.id_rest.data
+                category = request.form['dish_add_category_selector']
+            if re.search(r'[а-яА-Я]', dish_form.img_file.data.filename):
+                img_file = secure_filename(translit(dish_form.img_file.data.filename, reversed=True))
+            else:
+                img_file = secure_filename(dish_form.img_file.data.filename)
+            static_path = 'static/' + str(id_rest) + '/'
+            if not isdir(static_path):
+                mkdir(static_path)
+            dish_form.img_file.data.save(static_path + img_file)
+            img_link = BASE_URL + static_path + img_file
+            dish = Dish(
+                name=name,
+                cost=cost,
+                composition=composition,
+                img_link=img_link,
+                category=category,
+                id_rest=id_rest
+            )
+            db.session.add(dish)
+            db.session.commit()
+            flash("Блюдо добавлено", "success")
+            return redirect(url_for('admin'))
+
+    if dish_edit_form.dish_edit_submit.data:
+        if dish_edit_form.validate_on_submit() or dish_edit_form.is_submitted():
+            id_dish = dish_edit_form.id_dish.data
+            name = dish_edit_form.name.data
+            cost = dish_edit_form.cost.data
+            composition = dish_edit_form.composition.data
+            id_rest = dish_edit_form.id_rest.data
+            category = dish_edit_form.category.data
+            file_flag = False
+            try:
+                if re.search(r'[а-яА-Я]', dish_edit_form.img_file.data.filename):
+                    img_file = secure_filename(translit(dish_edit_form.img_file.data.filename, reversed=True))
+                else:
+                    img_file = secure_filename(dish_edit_form.img_file.data.filename)
+                static_path = 'static/' + str(id_rest) + '/'
+                if not isdir(static_path):
+                    mkdir(static_path)
+                dish_form.img_file.data.save(static_path + img_file)
+                img_link = BASE_URL + static_path + img_file
+                file_flag = True
+            except:
+                pass
+            try:
+                dish = Dish.query.filter_by(id=id_dish).first()
+                search_dish = SearchDishes.query.filter_by(dish_id=id_dish).first()
+                dish.name = name
+                search_dish.dish_name = name
+                dish.id_rest = id_rest
+                search_dish.rest_id = id_rest
+                dish.cost = cost
+                dish.composition = composition
+                dish.category = category
+                search_dish.dish_category = category
+                img_link = None
+                if file_flag:
+                    dish.img_link = img_link
+                db.session.commit()
+                flash("Блюдо изменено", "success")
+                return redirect(url_for('admin'))
+            except Exception as e:
+                flash(f"Попытка изменить блюдо неудачна\n{e}", "error")
+                return redirect(url_for('admin'))
+
+    if promo_dishes_form.promo_dish_submit.data:
+        if promo_dishes_form.validate_on_submit() or promo_dishes_form.is_submitted():
+            rest_id = promo_dishes_form.rest_id.data if promo_dishes_form.rest_id.data else request.form[
+                'promo_rest_selector']
+            if re.search(r'[а-яА-Я]', promo_dishes_form.img_file.data.filename):
+                img_file = secure_filename(translit(promo_dishes_form.img_file.data.filename, reversed=True))
+            else:
+                img_file = secure_filename(promo_dishes_form.img_file.data.filename)
+            static_path = 'static/' + str(rest_id) + '/'
+            if not isdir(static_path):
+                mkdir(static_path)
+            dish_form.img_file.data.save(static_path + img_file)
+            img_link = BASE_URL + static_path + img_file
+            promo_dish = PromoDish(img_link=img_link, rest_id=rest_id)
+            if PromoDish.query.filter_by(rest_id=rest_id).count() > 0:
+                PromoDish.query.filter_by(rest_id=rest_id).delete()
+            db.session.add(promo_dish)
+            db.session.commit()
+            flash("Акция добавлена", "success")
+            return redirect(url_for('admin'))
+    if promo_dishes_delete_form.promo_dish_delete_submit.data:
+        if promo_dishes_delete_form.validate_on_submit() or promo_dishes_delete_form.is_submitted():
+            if promo_dishes_delete_form.promo_dish_id.data:
+                promo_dish_id = promo_dishes_delete_form.promo_dish_id.data
+                PromoDish.query.filter_by(id=promo_dish_id).delete()
+            if promo_dishes_delete_form.promo_rest_id.data:
+                promo_rest_id = promo_dishes_delete_form.promo_rest_id.data
+                PromoDish.query.filter_by(rest_id=promo_rest_id).delete()
+            db.session.commit()
+            flash("Акция успешно удалена", "success")
+            return redirect(url_for('admin'))
+    if special_dish_form.s_dish_add_submit.data:
+        if special_dish_form.validate_on_submit() or special_dish_form.is_submitted():
+            try:
+                rest_id = request.form['s_dish_rest_selector']
+                cat_id = request.form['s_dish_cat_selector']
+                dish_id = request.form['s_dish_selector']
+                subcat_id = request.form['s_dish_subcat_selector']
+            except KeyError:
+                rest_id = request.form['combo_rest_selector']
+                cat_id = request.form['combo_cat_selector']
+                dish_id = request.form['combo_selector']
+                subcat_id = special_dish_form.subcat_id.data
+            s_dish = SpecialDish(subcat_id=subcat_id, dish_id=dish_id, category_id=cat_id, rest_id=rest_id)
+            db.session.add(s_dish)
+            db.session.commit()
+            flash("Блюдо добавлено", "success")
+            return redirect(url_for("admin"))
+    if search_word_form.search_word_submit.data:
+        if search_word_form.validate_on_submit() or search_word_form.is_submitted():
+            search_word = search_word_form.search_word.data
+            search_name = search_word_form.search_name.data
+            try:
+                db.session.add(SearchWords(name=search_name, words=search_word.lower()))
+                db.session.commit()
+                flash("Команда успешно добавлена", "success")
+            except Exception as inst:
+                flash(inst, "error")
+            return redirect(url_for("admin"))
+    if search_dish_form.search_dish_submit.data:
+        if search_dish_form.validate_on_submit() or search_dish_form.is_submitted():
+            search_word_id = search_dish_form.search_word_id.data
+            dish_id = search_dish_form.dish_id.data if search_dish_form.dish_id.data else request.form[
+                f'search_dish_selector_{search_word_id}']
+            dish_name = Dish.query.filter_by(id=dish_id).first().name
+            category = Dish.query.filter_by(id=dish_id).first().category
+            rest_id = search_dish_form.rest_id.data if search_dish_form.rest_id.data else request.form[
+                f'search_dish_rest_selector_{search_word_id}']
+            try:
+                db.session.add(
+                    SearchDishes(
+                        dish_id=dish_id,
+                        dish_name=dish_name,
+                        dish_category=category,
+                        rest_id=rest_id,
+                        search_words_id=search_word_id
+                    )
+                )
+                db.session.commit()
+                flash("Блюдо успешно добавлено", "success")
+            except Exception as inst:
+                flash(inst, "error")
+            return redirect(url_for("admin"))
+    if search_dish_del_form.search_dish_del_submit.data:
+        if search_dish_del_form.validate_on_submit() or search_dish_del_form.is_submitted():
+            search_dish_id = search_dish_del_form.search_dish_id.data
+            try:
+                SearchDishes.query.filter_by(id=search_dish_id).delete()
+                db.session.commit()
+                flash("Успешно удалено", "success")
+            except Exception as inst:
+                flash(inst, "error")
+            return redirect(url_for("admin"))
+    if search_word_del_form.search_word_del_submit.data:
+        if search_word_del_form.validate_on_submit() or search_word_del_form.is_submitted():
+            search_word_id = request.form['search_word_selector']
+            try:
+                SearchWords.query.filter_by(id=search_word_id).delete()
+                db.session.commit()
+                flash("Успешно удалено", "success")
+            except Exception as inst:
+                flash(inst, "error")
+            return redirect(url_for("admin"))
+    if special_dish_delete_form.special_dish_delete_submit.data:
+        if special_dish_delete_form.validate_on_submit() or special_dish_delete_form.is_submitted():
+            special_dish_id = special_dish_delete_form.special_dish_id.data
+            SpecialDish.query.filter_by(id=special_dish_id).delete()
+            db.session.commit()
+            flash("Успешно удалено", "success")
+            return redirect(url_for("admin"))
+
+    if category_form.category_add_submit.data:
+        if category_form.validate_on_submit() or category_form.is_submitted():
+            name = category_form.name.data
+            if current_user.ownership == 'all':
+                restaurant_id = request.form['category_add_rest_selector']
+            else:
+                restaurant_id = category_form.restaurant_id.data
+            category = Category(name=name, restaurant_id=restaurant_id)
+            db.session.add(category)
+            db.session.commit()
+            flash("Категория добавлена", "success")
+            return redirect(url_for('admin'))
+
+    if subcategory_add_form.subcategory_add_submit.data:
+        if subcategory_add_form.validate_on_submit() or subcategory_add_form.is_submitted():
+            name = subcategory_add_form.name.data
+            category_id = subcategory_add_form.category_id.data
+            subcategory = Subcategory(name=name, category_id=category_id)
+            db.session.add(subcategory)
+            db.session.commit()
+            flash("Подкатегория добавлена", "success")
+            return redirect(url_for('admin'))
+
+    if subcategory_del_form.subcategory_del_submit.data:
+        if subcategory_del_form.validate_on_submit() or subcategory_del_form.is_submitted():
+            subcat_id = request.form['subcat_del_selector']
+            SpecialDish.query.filter_by(subcat_id=subcat_id).delete()
+            Subcategory.query.filter_by(id=subcat_id).delete()
+            db.session.commit()
+            flash("Подкатегория удалена", "success")
+            return redirect(url_for('admin'))
+
+    if dish_delete_form.validate_on_submit() and dish_delete_form.dish_delete_submit.data:
+        dish_id = dish_delete_form.delete_id.data
+        Dish.query.filter_by(id=dish_id).delete()
+        SearchDishes.query.filter_by(dish_id=dish_id).delete()
+        db.session.commit()
+        flash("Блюдо успешно удалено", "success")
+        return redirect(url_for('admin'))
+
+    if restaurant_form.rest_add_submit.data:
+        if restaurant_form.validate_on_submit() or restaurant_form.is_submitted():
+            name = restaurant_form.name.data
+            address = restaurant_form.address.data
+            contact = restaurant_form.contact.data
+            passwd = restaurant_form.passwd.data
+            service_uid = restaurant_form.service_uid.data
+            email = restaurant_form.email.data if restaurant_form.email.data else None
+            restaurant = Restaurant(
+                name=name,
+                address=address,
+                contact=contact,
+                passwd=passwd,
+                service_uid=service_uid,
+                email=email,
+                min_total=0,
+                enabled=True
+            )
+            db.session.add(restaurant)
+            db.session.commit()
+            flash("Ресторан добавлен", "success")
+            return redirect(url_for('admin'))
+
+    if category_delete_form.category_delete_submit.data:
+        if category_delete_form.validate_on_submit() or category_delete_form.is_submitted():
+            restaurant_id = request.form[
+                'category_del_rest_selector'] if current_user.ownership == 'all' else category_delete_form.restaurant_id.data
+            name = request.form['category_delete_select_field'] if current_user.ownership == 'all' else request.form[
+                'category_rest_delete_select_field']
+            db.session.query(Category).filter_by(name=name, restaurant_id=restaurant_id).delete()
+            db.session.commit()
+            flash("Категория успешно удалена", "success")
+            return redirect(url_for('admin'))
+
+    if restaurant_delete_form.rest_delete_submit.data:
+        if restaurant_delete_form.validate_on_submit() or restaurant_delete_form.is_submitted():
+            name = request.form['rest_delete_select_field']
+            rest = Restaurant.query.filter_by(name=name).first()
+            OrderDetail.query.filter_by(order_rest_id=rest.id).delete()
+            Order.query.filter_by(order_rest_id=rest.id).delete()
+            Dish.query.filter_by(id_rest=rest.id).delete()
+            Category.query.filter_by(restaurant_id=rest.id).delete()
+            SpecialDish.query.filter_by(rest_id=rest.id).delete()
+            PromoDish.query.filter_by(rest_id=rest.id).delete()
+            Favorites.query.filter_by(rest_id=rest.id).delete()
+            Cart.query.filter_by(restaurant_id=rest.id).delete()
+            RestaurantDeliveryTerms.query.filter_by(rest_id=rest.id).delete()
+            Admin.query.filter_by(ownership=rest.name).delete()
+            del rest
+            Restaurant.query.filter_by(name=name).delete()
+            del name
+            db.session.commit()
+            flash("Ресторан успешно удален", "success")
+            return redirect(url_for('admin'))
+
+    if restaurant_edit_form.rest_edit_submit.data:
+        if restaurant_edit_form.validate_on_submit() or restaurant_edit_form.is_submitted():
+            rest_id = restaurant_edit_form.id.data
+            name = restaurant_edit_form.name.data
+            address = restaurant_edit_form.address.data
+            contact = restaurant_edit_form.contact.data
+            passwd = restaurant_edit_form.passwd.data
+            email = restaurant_edit_form.email.data
+            min_total = restaurant_edit_form.min_total.data
+            rest = Restaurant.query.filter_by(id=rest_id).first()
+            owner = Admin.query.filter_by(ownership=rest.name).first()
+            if name:
+                rest.name = name
+                if owner:
+                    owner.ownership = name
+            if address: rest.address = address
+            if contact: rest.contact = contact
+            if passwd: rest.passwd = passwd
+            if email: rest.email = email
+            if min_total: rest.min_total = min_total
+            db.session.commit()
+            flash("Изменения успешно внесены", "success")
+            return redirect(url_for('admin'))
+
+    if restaurant_enable_form.rest_enable_submit.data:
+        if restaurant_enable_form.validate_on_submit() or restaurant_enable_form.is_submitted():
+            enabled = True if request.form['rest_enable_submit'] == 'Включить' else False
+            rest_id = restaurant_enable_form.rest_id.data
+            try:
+                rest = Restaurant.query.filter_by(id=rest_id).first()
+                rest.enabled = enabled
+                db.session.commit()
+                flash("Изменения успешно внесены", "success")
+            except Exception as e:
+                flash(e)
+            return redirect(url_for('admin'))
+
+    if admin_add_form.admin_add_button.data:
+        if admin_add_form.validate_on_submit() or admin_add_form.is_submitted():
+            username = admin_add_form.username.data
+            passwd = admin_add_form.passwd.data
+            mail = admin_add_form.email.data
+            ownership = request.form['admin_add_rest_selector']
+            usr = Admin(username=username, email=mail, password=passwd, ownership=ownership)
+            db.session.add(usr)
+            db.session.commit()
+            return redirect(url_for('admin'))
+
+    if rest_delivery_terms_form.delivery_terms_submit.data:
+        if rest_delivery_terms_form.validate_on_submit() or rest_delivery_terms_form.is_submitted():
+            rest_id = rest_delivery_terms_form.rest_id.data
+            terms = rest_delivery_terms_form.terms.data
+            rest_inn = rest_delivery_terms_form.rest_inn.data
+            rest_ogrn = rest_delivery_terms_form.rest_ogrn.data
+            rest_fullname = rest_delivery_terms_form.rest_fullname.data
+            rest_address = rest_delivery_terms_form.rest_address.data
+            delivery_terms = RestaurantDeliveryTerms(
+                rest_id=rest_id,
+                terms=terms,
+                rest_inn=rest_inn,
+                rest_ogrn=rest_ogrn,
+                rest_fullname=rest_fullname,
+                rest_address=rest_address
+            )
+            db.session.add(delivery_terms)
+            db.session.commit()
+            return redirect(url_for('admin'))
+
+    if rest_delivery_terms_edit_form.terms_edit_submit.data:
+        if rest_delivery_terms_edit_form.validate_on_submit() or rest_delivery_terms_edit_form.is_submitted():
+            rest_id = rest_delivery_terms_edit_form.rest_id.data
+            terms_data = rest_delivery_terms_edit_form.terms.data
+            rest_inn = rest_delivery_terms_edit_form.rest_inn.data
+            rest_ogrn = rest_delivery_terms_edit_form.rest_ogrn.data
+            rest_fullname = rest_delivery_terms_edit_form.rest_fullname.data
+            rest_address = rest_delivery_terms_edit_form.rest_address.data
+            terms = RestaurantDeliveryTerms.query.filter_by(rest_id=rest_id).first()
+            if terms:
+                terms.terms = terms_data if terms_data else None
+                terms.rest_inn = rest_inn if rest_inn else None
+                terms.rest_ogrn = rest_ogrn if rest_ogrn else None
+                terms.rest_fullname = rest_fullname if rest_fullname else None
+                terms.rest_address = rest_address if rest_address else None
+                db.session.commit()
+            return redirect(url_for('admin'))
+
+    return render_template(
+        'admin.html',
+        dishes=dishes,
+        s_dishes=s_dishes,
+        promo_dishes=promo_dishes,
+        search_dishes=search_dishes,
+        search_words=search_words,
+        restaurants=restaurants,
+        categories=categories,
+        subcategories=subcategories,
+        dish_form=dish_form,
+        promo_dishes_form=promo_dishes_form,
+        category_form=category_form,
+        subcategory_add_form=subcategory_add_form,
+        subcategory_del_form=subcategory_del_form,
+        special_dish_form=special_dish_form,
+        special_dish_delete_form=special_dish_delete_form,
+        dish_edit_form=dish_edit_form,
+        dish_delete_form=dish_delete_form,
+        promo_dishes_delete_form=promo_dishes_delete_form,
+        restaurant_form=restaurant_form,
+        category_delete_form=category_delete_form,
+        restaurant_delete_form=restaurant_delete_form,
+        restaurant_edit_form=restaurant_edit_form,
+        restaurant_enable_form=restaurant_enable_form,
+        admin_add_form=admin_add_form,
+        rest_delivery_terms_form=rest_delivery_terms_form,
+        rest_delivery_terms_edit_form=rest_delivery_terms_edit_form,
+        search_word_form=search_word_form,
+        search_word_del_form=search_word_del_form,
+        search_dish_form=search_dish_form,
+        search_dish_del_form=search_dish_del_form,
+        delivery_terms=delivery_terms
+    )
