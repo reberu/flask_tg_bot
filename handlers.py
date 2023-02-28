@@ -2,12 +2,12 @@ import re
 from datetime import datetime
 
 from sqlalchemy import func
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, KeyboardButton
 from app import db, send_email
 from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites, \
     SpecialDish
 from models import OrderDetail as OD
-from settings import BOT, YKT, RULES
+from settings import BOT, YKT, RULES, BASE_URL
 from utils import rest_menu_keyboard, write_history
 
 
@@ -19,6 +19,8 @@ def restaurant_callback(call):
 
     def categories_menu():
         kbd = InlineKeyboardMarkup()
+        webApp = WebAppInfo(BASE_URL + "webapp")
+        kbd.add(InlineKeyboardButton(text="Компактный просмотр", web_app=webApp))
         for category in categories.all():
             kbd.add(InlineKeyboardButton(text=category.name, callback_data=f'rest_{rest_id}_cat_{category.id}'))
         cb_data = f'rest_{rest_id}_delivery_time_call_back'
@@ -35,6 +37,7 @@ def restaurant_callback(call):
         else:
             BOT.edit_message_text(text=text, chat_id=call.from_user.id, message_id=call.message.message_id,
                                   reply_markup=kbd)
+        write_history(call.message.id, call.from_user.id, rest_id, False)
 
     def show_dishes():
         text = 'Если отключены автозагрузки фотографий для удобства просмотра блюд включите в ' \
