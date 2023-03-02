@@ -335,6 +335,17 @@ def webapp():
     return render_template('webapp.html', dishes=dishes, categories=categories, logs=logs)
 
 
+@app.route('/webapp_cart', methods=['GET'])
+def webapp_cart():
+    uid = request.args.get('uid', default=0, type=int)
+    return render_template('webapp_cart.html', uid=uid)
+
+
+@app.route('/webapp_confirm', methods=['GET'])
+def webapp_confirm():
+    return render_template('webapp_confirm.html')
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.query(Admin).get(user_id)

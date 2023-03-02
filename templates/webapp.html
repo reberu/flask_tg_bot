@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 {% set log = logs|last %}
-{% set ns = namespace (rest_id = log.message_text|int, uid = log.chat_id, check = True) %}
+{% set ns = namespace (rest_id = log.message_text|int, uid = log.chat_id) %}
 <head>
    <meta charset="UTF-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -15,17 +15,18 @@
         flex-wrap: wrap;
         justify-content: center;
     }
-    .flex-container > h1 {
+    .flex-container > h3 {
         flex-basis: 100%;
     }
     .flex-container > div {
-        flex-basis: 47%;
+        flex-basis: 45%;
         box-shadow: 0 0 0 1px black;
-        width: 50%;
+        width: 45%;
         margin: 5px;
         margin-bottom: 5px;
         text-align: center;
         line-height: 100px;
+        border-radius: 5px;
     }
     .container-img {
         min-width: 100%;
@@ -33,26 +34,27 @@
         flex-shrink: 0;
     }
     .container-text {
-        line-height: 25px;
-        margin-top: 0.5em;
-        margin-bottom: 1em;
-        white-space: wrap;
+        line-height: 1.5em;
+        height: 3em;
+        white-space: nowrap;
         overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
     }
 </style>
 <body>
 
-   <div class="flex-container">
+   <div class="flex-container" id="wrapper">
         {% for category in categories %}
             {% if category.restaurant_id == ns.rest_id %}
-                <h1>{{ category.name }}</h1>
+                <h3>{{ category.name }}</h3>
                 {% for dish in dishes %}
                     {% if dish.id_rest == ns.rest_id and dish.category == category.name %}
                         <div>
 <!--                            <div class="container-img"><img src="{{dish.img_link}}"></div>-->
                             <p>{{ dish.name }}</p>
                             <div class="container-text">{{ dish.composition }}</div>
-                            <button class="button">{{ dish.cost }} р.</button>
+                            <button class="button" id="btn-{{dish.id}}">{{ dish.cost }} р.</button>
                         </div>
                     {% endif %}
                 {% endfor %}
@@ -60,52 +62,29 @@
             {% endif %}
         {% endfor %}
    </div>
-   <div class="main">
-      <button id="btn" class="button">Show/Hide Main Button</button>
-      <button id="btnED" class="button">Enable/Disable Main Button</button>
-   </div>
 </body>
 
 <script>
-   let tg = window.Telegram.WebApp; //получаем объект webapp телеграма
-
-   tg.expand(); //расширяем на все окно
-
-   tg.MainButton.text = "Changed Text"; //изменяем текст кнопки
-   tg.MainButton.setText("Changed Text1"); //изменяем текст кнопки иначе
-   tg.MainButton.textColor = "#F55353"; //изменяем цвет текста кнопки
-   tg.MainButton.color = "#143F6B"; //изменяем цвет бэкграунда кнопки
-   tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
-
-   let btn = document.getElementById("btn"); //получаем кнопку скрыть/показать
-
-   btn.addEventListener('click', function(){ //вешаем событие на нажатие html-кнопки
-      if (tg.MainButton.isVisible){ //если кнопка показана
-         tg.MainButton.hide() //скрываем кнопку
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.MainButton.text = "В корзину"; //изменяем текст кнопки
+    tg.MainButton.textColor = "#F55353"; //изменяем цвет текста кнопки
+    tg.MainButton.color = "#143F6B"; //изменяем цвет бэкграунда кнопки
+    tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
+    tg.MainButton.show();
+    Telegram.WebApp.onEvent('mainButtonClicked', function(){
+        tg.showAlert("It's clicked!");
+        window.location = "/webapp_cart?uid=" + tg.initDataUnsafe.user.id;
+    });
+    const wrapper = document.getElementById('wrapper');
+    wrapper.addEventListener('click', (event) => {
+      const isButton = event.target.nodeName === 'BUTTON';
+      if (!isButton) {
+        return;
       }
-      else{ //иначе
-         tg.MainButton.show() //показываем
-      }
-   });
-
-   let btnED = document.getElementById("btnED"); //получаем кнопку активировать/деактивировать
-   btnED.addEventListener('click', function(){ //вешаем событие на нажатие html-кнопки
-      if (tg.MainButton.isActive){ //если кнопка показана
-         tg.MainButton.setParams({"color": "#E0FFFF"}); //меняем цвет
-         tg.MainButton.disable() //скрываем кнопку
-      }
-      else{ //иначе
-         tg.MainButton.setParams({"color": "#143F6B"}); //меняем цвет
-         tg.MainButton.enable() //показываем
-      }
-   });
-
-   Telegram.WebApp.onEvent('mainButtonClicked', function(){
-      tg.sendData("some string that we need to send");
-      //tg.answerWebAppQuery();
-      tg.showAlert("data sent!");
-      //при клике на основную кнопку отправляем данные в строковом виде
-   });
-
+      var btn = document.getElementById(event.target.id);
+      btn.style.display = 'none';
+      tg.showAlert(event.target.id);
+    });
 </script>
 </html>
