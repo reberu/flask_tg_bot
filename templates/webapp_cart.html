@@ -1,10 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Title</title>
+   <meta charset="UTF-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Robofood webapp</title>
+   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
 </head>
 <body>
-<h3>{{ uid }}</h3>
+    <h1>Cart page</h1>
+    <h3>{{ uid }}</h3>
 </body>
 </html>
+<script>
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.MainButton.text = "В корзину"; //изменяем текст кнопки
+    tg.MainButton.textColor = "#F55353"; //изменяем цвет текста кнопки
+    tg.MainButton.color = "#143F6B"; //изменяем цвет бэкграунда кнопки
+    tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
+    tg.MainButton.show();
+    Telegram.WebApp.onEvent('mainButtonClicked', function(){
+        // tg.showAlert("It's clicked!");
+        window.location = "/webapp_confirm?uid=" + tg.initDataUnsafe.user.id;
+
+    });
+</script>

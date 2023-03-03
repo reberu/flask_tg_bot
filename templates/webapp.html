@@ -8,6 +8,7 @@
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>Robofood webapp</title>
    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
 </head>
 <style>
     .flex-container {
@@ -28,10 +29,17 @@
         line-height: 100px;
         border-radius: 5px;
     }
-    .container-img {
-        min-width: 100%;
-        min-height: 100%;
-        flex-shrink: 0;
+    .elements {
+        display: None;
+        align-items: center;
+        justify-content: center;
+    }
+    .button {
+        height: 1.5em;
+    }
+    img {
+        width: 100%;
+        height: auto;
     }
     .container-text {
         line-height: 1.5em;
@@ -51,10 +59,15 @@
                 {% for dish in dishes %}
                     {% if dish.id_rest == ns.rest_id and dish.category == category.name %}
                         <div>
-<!--                            <div class="container-img"><img src="{{dish.img_link}}"></div>-->
+                            <div class="container-img"><img src="{{dish.img_link}}"></div>
                             <p>{{ dish.name }}</p>
                             <div class="container-text">{{ dish.composition }}</div>
-                            <button class="button" id="btn-{{dish.id}}">{{ dish.cost }} р.</button>
+                            <button type="button" class="btn btn-light" id="btn-{{dish.id}}">{{ dish.cost }} р.</button>
+                            <div class="elements" id="item-btn-{{dish.id}}">
+                                <div class="btn" id="btn-rem-{{dish.id}}">-</div>
+                                <div class="btn" id="amount-btn-{{dish.id}}">0</div>
+                                <div class="btn" id="btn-add-{{dish.id}}">+</div>
+                            </div>
                         </div>
                     {% endif %}
                 {% endfor %}
@@ -73,8 +86,9 @@
     tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
     tg.MainButton.show();
     Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        tg.showAlert("It's clicked!");
+        // tg.showAlert("It's clicked!");
         window.location = "/webapp_cart?uid=" + tg.initDataUnsafe.user.id;
+
     });
     const wrapper = document.getElementById('wrapper');
     wrapper.addEventListener('click', (event) => {
@@ -82,9 +96,12 @@
       if (!isButton) {
         return;
       }
-      var btn = document.getElementById(event.target.id);
+      let btn = document.getElementById(event.target.id);
       btn.style.display = 'none';
-      tg.showAlert(event.target.id);
+      document.getElementById("amount-"+event.target.id).innerHTML = 1;
+      // const el = document.getElementById( 'navLinks' );
+      document.getElementById("item-"+event.target.id).style.display = "flex";
+      // tg.showAlert(event.target.id);
     });
 </script>
 </html>
