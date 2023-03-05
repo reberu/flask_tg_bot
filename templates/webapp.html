@@ -64,9 +64,9 @@
                             <div class="container-text">{{ dish.composition }}</div>
                             <button type="button" class="btn btn-light" id="btn-{{dish.id}}">{{ dish.cost }} р.</button>
                             <div class="elements" id="item-btn-{{dish.id}}">
-                                <div class="btn" id="btn-rem-{{dish.id}}">-</div>
+                                <div class="btn plusminus" id="btn-rem-{{dish.id}}">-</div>
                                 <div class="btn" id="amount-btn-{{dish.id}}">0</div>
-                                <div class="btn" id="btn-add-{{dish.id}}">+</div>
+                                <div class="btn plusminus" id="btn-add-{{dish.id}}">+</div>
                             </div>
                         </div>
                     {% endif %}
@@ -79,17 +79,12 @@
 
 <script>
     let tg = window.Telegram.WebApp;
+    let cart = {};
     tg.expand();
-    tg.MainButton.text = "В корзину"; //изменяем текст кнопки
-    tg.MainButton.textColor = "#F55353"; //изменяем цвет текста кнопки
-    tg.MainButton.color = "#143F6B"; //изменяем цвет бэкграунда кнопки
-    tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
+    tg.MainButton.text = "Корзина"; //изменяем текст кнопки
+    tg.MainButton.textColor = "#FFFFFF"; //изменяем цвет текста кнопки
+    tg.MainButton.color = "#0275D8"; //изменяем цвет бэкграунда кнопки
     tg.MainButton.show();
-    Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        // tg.showAlert("It's clicked!");
-        window.location = "/webapp_cart?uid=" + tg.initDataUnsafe.user.id;
-
-    });
     const wrapper = document.getElementById('wrapper');
     wrapper.addEventListener('click', (event) => {
       const isButton = event.target.nodeName === 'BUTTON';
@@ -99,9 +94,33 @@
       let btn = document.getElementById(event.target.id);
       btn.style.display = 'none';
       document.getElementById("amount-"+event.target.id).innerHTML = 1;
-      // const el = document.getElementById( 'navLinks' );
       document.getElementById("item-"+event.target.id).style.display = "flex";
-      // tg.showAlert(event.target.id);
+      cart[event.target.id.split("-")[1]] = 1;
+    });
+    document.querySelectorAll('.plusminus').forEach(function(e) {
+        e.addEventListener('click', (event) => {
+            let amountField = document.getElementById('amount-btn-' + e.id.split('-')[2]);
+            let amount = parseInt(amountField.innerHTML);
+            if (e.id.split('-')[1] == 'add') {
+                amount += 1;
+                cart[e.id.split('-')[2]] += 1;
+            } else if (e.id.split('-')[1] == 'rem') {
+                amount -= 1;
+                cart[e.id.split('-')[2]] -= 1;
+                if (amount == 0) {
+                    document.getElementById("item-btn-" + e.id.split('-')[2]).style.display = "none";
+                    document.getElementById("btn-" + e.id.split('-')[2]).style.display = "inline-block";
+                }
+            };
+            amountField.innerHTML = amount;
+        });
+    });
+    Telegram.WebApp.onEvent('mainButtonClicked', function(){
+        let params = "uid=" + tg.initDataUnsafe.user.id;
+        for (let key in cart) {
+            params += "&" + key + "=" + cart[key];
+        }
+        window.location = "/webapp_cart?" + params;
     });
 </script>
 </html>
