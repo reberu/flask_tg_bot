@@ -62,7 +62,7 @@
                             <div class="container-img"><img src="{{dish.img_link}}"></div>
                             <p>{{ dish.name }}</p>
                             <div class="container-text">{{ dish.composition }}</div>
-                            <button type="button" class="btn btn-light" id="btn-{{dish.id}}">{{ dish.cost }} р.</button>
+                            <button type="button" class="btn btn-light" id="btn-{{dish.id}}">{{ dish.cost }} ₽</button>
                             <div class="elements" id="item-btn-{{dish.id}}">
                                 <div class="btn plusminus" id="btn-rem-{{dish.id}}">-</div>
                                 <div class="btn" id="amount-btn-{{dish.id}}">0</div>
@@ -81,10 +81,13 @@
     let tg = window.Telegram.WebApp;
     let cart = {};
     tg.expand();
-    tg.MainButton.text = "Корзина"; //изменяем текст кнопки
-    tg.MainButton.textColor = "#FFFFFF"; //изменяем цвет текста кнопки
-    tg.MainButton.color = "#0275D8"; //изменяем цвет бэкграунда кнопки
+    tg.MainButton.text = "Корзина";
+    tg.MainButton.textColor = "#FFFFFF";
+    tg.MainButton.color = "#0275D8";
     tg.MainButton.show();
+    if (tg.BackButton.isVisible) {
+        tg.BackButton.hide();
+    }
     const wrapper = document.getElementById('wrapper');
     wrapper.addEventListener('click', (event) => {
       const isButton = event.target.nodeName === 'BUTTON';

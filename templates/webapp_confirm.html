@@ -9,20 +9,16 @@
 </head>
 <body>
     <h1>Cart confirm page</h1>
-    <h3>{{ uid }}</h3>
 </body>
 </html>
 <script>
     let tg = window.Telegram.WebApp;
     tg.expand();
-    tg.MainButton.text = "Продолжить"; //изменяем текст кнопки
-    tg.MainButton.textColor = "#F55353"; //изменяем цвет текста кнопки
-    tg.MainButton.color = "#143F6B"; //изменяем цвет бэкграунда кнопки
-    tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
+    tg.MainButton.text = "Продолжить";
+    tg.MainButton.textColor = "#FFFFFF";
+    tg.MainButton.color = "#0275D8";
     tg.MainButton.show();
     Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        // tg.showAlert("It's clicked!");
         window.location = "/webapp_confirm?uid=" + tg.initDataUnsafe.user.id;
-
     });
 </script>

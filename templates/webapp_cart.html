@@ -7,23 +7,85 @@
    <title>Robofood webapp</title>
    <script src="https://telegram.org/js/telegram-web-app.js"></script>
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+   <style>
+    .item1 { grid-area: img;}
+    .item2 { grid-area: img;}
+    .item3 { grid-area: name;}
+    .item4 { grid-area: name;}
+    .item5 { grid-area: name;}
+    .item6 { grid-area: minus;}
+    .item7 { grid-area: quantity;}
+    .item8 { grid-area: plus;}
+    .item9 { grid-area: total; margin-right: 5px;}
+    .item10 { grid-area: total; margin-right: 5px;}
+
+    .grid-container {
+      display: grid;
+      grid-template-areas:
+        'img name name name total'
+        'img minus quantity plus total';
+      grid-column-gap: 30px;
+      background-color: white;
+    }
+
+    .grid-container > div {
+      text-align: center;
+    }
+
+    img {
+       width: 100%;
+    }
+   </style>
 </head>
 <body>
-    <h1>Cart page</h1>
-    <h3>{{ uid }}</h3>
+    {% for key in items %}
+    <div class="grid-container">
+        <div class="item1">
+            <img src="{{ items[key]['img_link'] }}">
+        </div>
+        <div class="item2">
+            <img src="{{ items[key]['img_link'] }}">
+        </div>
+        <div class="item3">
+            <div>{{ items[key]['name'] }}</div>
+        </div>
+        <div class="item4">
+            <div>{{ items[key]['name'] }}</div>
+        </div>
+        <div class="item5">
+            <div>{{ items[key]['name'] }}</div>
+        </div>
+        <div class="item6">
+            <div class="btn plusminus" id="btn-rem-{{ key }}">-</div>
+        </div>
+        <div class="item7">
+            <div class="btn" id="amount-btn-{{ key }}">{{ items[key]['quantity'] }}</div>
+        </div>
+        <div class="item8">
+            <div class="btn plusminus" id="btn-add-{{ key }}">-</div>
+        </div>
+        <div class="item9">
+            <p>{{ items[key]['quantity']|int * items[key]['cost'] }} ₽</p>
+        </div>
+        <div class="item10">
+            <p>{{ items[key]['quantity']|int * items[key]['cost'] }} ₽</p>
+        </div>
+    </div> <br/>
+    {% endfor %}
 </body>
 </html>
 <script>
     let tg = window.Telegram.WebApp;
     tg.expand();
-    tg.MainButton.text = "Оформить заказ"; //изменяем текст кнопки
-    tg.MainButton.textColor = "#F55353"; //изменяем цвет текста кнопки
-    tg.MainButton.color = "#143F6B"; //изменяем цвет бэкграунда кнопки
-    tg.MainButton.setParams({"color": "#143F6B"}); //так изменяются все параметры
+    tg.MainButton.text = "Оформить заказ";
+    tg.MainButton.textColor = "#FFFFFF";
+    tg.MainButton.color = "#0275D8";
     tg.MainButton.show();
+    tg.BackButton.show();
     Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        // tg.showAlert("It's clicked!");
         window.location = "/webapp_confirm?uid=" + tg.initDataUnsafe.user.id;
-
+    });
+    Telegram.WebApp.onEvent('backButtonClicked', function(){
+        window.location = "/webapp";
     });
 </script>
