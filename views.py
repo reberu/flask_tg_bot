@@ -335,6 +335,23 @@ def webapp():
     return render_template('webapp.html', dishes=dishes, categories=categories, logs=logs)
 
 
+@app.route('/webapp_cart', methods=['GET'])
+def webapp_cart():
+    uid = request.args.get('uid', default=0, type=int)
+    cart = request.args.to_dict(flat=True)
+    cart.pop('uid')
+    items = {}
+    for item in cart:
+        dish = Dish.query.filter_by(id=int(item)).first()
+        items[item] = {'quantity': cart[item], 'name': dish.name, 'img_link': dish.img_link, 'cost': dish.cost}
+    return render_template('webapp_cart.html', uid=uid, items=items)
+
+
+@app.route('/webapp_confirm', methods=['GET'])
+def webapp_confirm():
+    return render_template('webapp_confirm.html')
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.query(Admin).get(user_id)
