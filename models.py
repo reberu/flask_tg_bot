@@ -22,6 +22,15 @@ class Restaurant(db.Model):
         ValidateEmail(Restaurant.email, True, True, "Почта указана некорректно")
 
 
+class RestaurantInfo(db.Model):
+    __tablename__ = 'rest_info'
+    id = db.Column(db.Integer(), primary_key=True)
+    rest_id = db.Column(db.Integer(), nullable=False)
+    img = db.Column(db.Text(), default='/static/dummy_rest.jpg')
+    delivery_time = db.Column(db.Text(), default='Не указано')
+    takeaway_address = db.Column(db.Text(), default='Не указано')
+
+
 class Category(db.Model):
     __tablename__ = 'categories'
     id = db.Column(db.Integer(), primary_key=True)
@@ -45,6 +54,7 @@ class Dish(db.Model):
     img_link = db.Column(db.Text(), nullable=False)
     category = db.Column(db.Text(), db.ForeignKey('categories.name'))
     id_rest = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
+    status = db.Column(db.Boolean(), default=True)
 
 
 class SpecialDish(db.Model):

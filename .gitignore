@@ -125,7 +125,7 @@ venv.bak/
 dmypy.json
 settings.py
 
-answer.json
+static/answer.json
 data.json
 
 db_.sqlite3

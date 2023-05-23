@@ -1,11 +1,12 @@
 import re
 
 from telebot import types
+from telebot.types import WebAppInfo
 
 from app import db
 from models import User, History, Restaurant, Order
 from datetime import datetime
-from settings import YKT, MONTHS
+from settings import YKT, MONTHS, BASE_URL
 
 
 def check_user(msg):
@@ -52,6 +53,7 @@ def rest_menu_keyboard():
     for restaurant in restaurants:
         if not restaurant.enabled:
             continue
+        webapp = WebAppInfo(BASE_URL + f"webapp/{restaurant.id}")
         if match := re.search(pattern, restaurant.name, re.IGNORECASE):
             if ' ' not in match.group(1):
                 start_time = datetime.strptime(match.group(1).split('-')[0], '%H:%M').time()
@@ -62,10 +64,10 @@ def rest_menu_keyboard():
 
             if is_time_between(start_time, end_time, current_time):
                 keyboard.add(
-                    types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'rest_{restaurant.id}'))
+                    types.InlineKeyboardButton(text=f'{restaurant.name}', web_app=webapp))
         else:
             keyboard.add(
-                types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'rest_{restaurant.id}'))
+                types.InlineKeyboardButton(text=f'{restaurant.name}', web_app=webapp))
     return keyboard
 
 

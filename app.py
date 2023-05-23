@@ -19,20 +19,19 @@ def send_email(host, subject, text):
     msg['From'] = user
     msg['To'] = host
     msg.attach(MIMEText(text, 'plain'))
-    print(msg)
     with smtplib.SMTP(smtp_server, port) as server:
         server.starttls()
         server.login(user, pswd)
         server.send_message(msg)
-        print('message sent')
         server.quit()
 
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-manager = Manager(app)
 db = SQLAlchemy(app)
+manager = Manager(app)
+
 sched = BackgroundScheduler()
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'

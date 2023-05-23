@@ -1,129 +1,184 @@
 <!DOCTYPE html>
-<html>
-{% set log = logs|last %}
-{% set ns = namespace (rest_id = log.message_text|int, uid = log.chat_id) %}
+<html lang="ru">
 <head>
    <meta charset="UTF-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>Robofood webapp</title>
    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+<!--   <script src="/static/scroll-navigation.js"></script>-->
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+   <link rel="stylesheet" href="/static/webapp.css">
 </head>
-<style>
-    .flex-container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    .flex-container > h3 {
-        flex-basis: 100%;
-    }
-    .flex-container > div {
-        flex-basis: 45%;
-        box-shadow: 0 0 0 1px black;
-        width: 45%;
-        margin: 5px;
-        margin-bottom: 5px;
-        text-align: center;
-        line-height: 100px;
-        border-radius: 5px;
-    }
-    .elements {
-        display: None;
-        align-items: center;
-        justify-content: center;
-    }
-    .button {
-        height: 1.5em;
-    }
-    img {
-        width: 100%;
-        height: auto;
-    }
-    .container-text {
-        line-height: 1.5em;
-        height: 3em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        width: 100%;
-    }
-</style>
 <body>
-
-   <div class="flex-container" id="wrapper">
+    <div class="nav-bar fixed-top">
         {% for category in categories %}
-            {% if category.restaurant_id == ns.rest_id %}
-                <h3>{{ category.name }}</h3>
+            {% if category.restaurant_id == rest.id %}
+                <div id="nav-category-{{category.id}}" class="nav-items"><a href="#category-{{category.id}}" class="scrollNav-links" id="link-category-{{category.id}}">{{ category.name }}</a></div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <div class="rest-card">
+        <div class="rest-name">{{ rest.name }}</div>
+        <div class="rest-info">Время доставки: {{info.delivery_time}}<br>Адрес самовывоза: {{info.takeaway_address}}</div>
+    </div>
+    <div class="flex-container rest_{{rest.id}}" id="wrapper">
+       <div class="item terms">
+           <img src="{{ info.img if info.img else '/static/dummy_rest.jpg' }}">
+           <div class="dish-name"><b>Условия доставки</b></div>
+       </div>
+        {% for category in categories %}
+            {% if category.restaurant_id == rest.id %}
+                <div class="category-name scrollNav-content" id="category-{{category.id}}">{{ category.name }}</div>
                 {% for dish in dishes %}
-                    {% if dish.id_rest == ns.rest_id and dish.category == category.name %}
-                        <div>
-                            <div class="container-img"><img src="{{dish.img_link}}"></div>
-                            <p>{{ dish.name }}</p>
-                            <div class="container-text">{{ dish.composition }}</div>
-                            <button type="button" class="btn btn-light" id="btn-{{dish.id}}">{{ dish.cost }} ₽</button>
+                    {% if dish.id_rest == rest.id and dish.category == category.name and dish.status %}
+                        <div class="item category-id-{{category.id}}" id="itemCard-{{dish.id}}">
+                            <img src="{{dish.img_link}}" id="img-item-{{dish.id}}">
+                            <div class="dish-name">{{ dish.name }}</div>
+                            <div class="container-text"><p class="dish-compose"><small class="dish-compose-text">{{ dish.composition }}</small></p></div>
+                            <div class="dish-cost" id="btn-{{dish.id}}">{{ dish.cost }} ₽</div>
                             <div class="elements" id="item-btn-{{dish.id}}">
-                                <div class="btn plusminus" id="btn-rem-{{dish.id}}">-</div>
-                                <div class="btn" id="amount-btn-{{dish.id}}">0</div>
-                                <div class="btn plusminus" id="btn-add-{{dish.id}}">+</div>
+                                <div class="plusminus" id="btn-rem-{{dish.id}}">-</div>
+                                <div class="quantity" id="amount-btn-{{dish.id}}">0</div>
+                                <div class="plusminus" id="btn-add-{{dish.id}}">+</div>
                             </div>
                         </div>
                     {% endif %}
                 {% endfor %}
-                <br/>
             {% endif %}
         {% endfor %}
    </div>
+    <div id="hiddenDishId" style="display:none;">{{dish_id}}</div>
 </body>
 
 <script>
     let tg = window.Telegram.WebApp;
-    let cart = {};
     tg.expand();
     tg.MainButton.text = "Корзина";
     tg.MainButton.textColor = "#FFFFFF";
     tg.MainButton.color = "#0275D8";
-    tg.MainButton.show();
-    if (tg.BackButton.isVisible) {
-        tg.BackButton.hide();
+    if ($(".elements").is(":visible")) {
+        tg.MainButton.show();
     }
-    const wrapper = document.getElementById('wrapper');
-    wrapper.addEventListener('click', (event) => {
-      const isButton = event.target.nodeName === 'BUTTON';
-      if (!isButton) {
-        return;
-      }
-      let btn = document.getElementById(event.target.id);
-      btn.style.display = 'none';
-      document.getElementById("amount-"+event.target.id).innerHTML = 1;
-      document.getElementById("item-"+event.target.id).style.display = "flex";
-      cart[event.target.id.split("-")[1]] = 1;
-    });
-    document.querySelectorAll('.plusminus').forEach(function(e) {
-        e.addEventListener('click', (event) => {
-            let amountField = document.getElementById('amount-btn-' + e.id.split('-')[2]);
-            let amount = parseInt(amountField.innerHTML);
-            if (e.id.split('-')[1] == 'add') {
-                amount += 1;
-                cart[e.id.split('-')[2]] += 1;
-            } else if (e.id.split('-')[1] == 'rem') {
-                amount -= 1;
-                cart[e.id.split('-')[2]] -= 1;
-                if (amount == 0) {
-                    document.getElementById("item-btn-" + e.id.split('-')[2]).style.display = "none";
-                    document.getElementById("btn-" + e.id.split('-')[2]).style.display = "inline-block";
+    tg.BackButton.hide();
+    let uid = tg.initDataUnsafe.user.id;
+<!--    let uid = 113737020;-->
+    let dishId = $("#hiddenDishId").text()
+    let amount = 0;
+    $(document).ready(function(){
+        let x = document.getElementsByClassName("scrollNav-active");
+        if(x.length > 0) { x[0].classList.remove("scrollNav-active"); }
+        $(".scrollNav-links").first().addClass("scrollNav-active");
+        let rest_id = $("#wrapper").attr("class").split(' ')[1]
+        $.ajax({
+            url: "/webapp/data",
+            data: {"uid": uid, "method": "onload", "rest_id": rest_id},
+            type: "POST",
+            success: function(data){
+                if (!($.isEmptyObject(data.cart))) {
+                    for (var key in data.cart) {
+                        amount += Number(data.cart[key]["price"]) * Number(data.cart[key]["quantity"]);
+                        $("#btn-" + key).hide();
+                        $("#item-btn-" + key).show();
+                        $("#amount-btn-" + key).html(data.cart[key]['quantity']);
+                        $("#item-btn-" + key).css("display", "flex");
+                        $("#itemCard-" + key).css("border-bottom", "thick double #0275D8");
+                    }
+                    tg.MainButton.setText("Корзина " + amount + " ₽");
                 }
-            };
-            amountField.innerHTML = amount;
+                if ($(".elements").is(":visible")) {
+                    tg.MainButton.show();
+                } else {
+                    tg.MainButton.hide();
+                }
+            }
+        });
+        if (dishId != "None") {
+            let el = document.getElementById("itemCard-" + dishId);
+            el.scrollIntoView();
+        }
+    });
+    $('img[id^="img-item-"]').click(function(){
+        let category = "category-" + $(this).parent().attr("class").split("-")[2];
+        let itemId = $(this).attr("id").split("-")[2];
+        window.location.href = "/webapp_item?uid=" + uid + "&item=" + itemId + "&category=" + category;
+    });
+    $(".terms").click(function(){
+        let rest_id = $("#wrapper").attr("class").split('_')[1]
+        window.location = "/webapp_rest/" + rest_id;
+    });
+    $(".nav-items").on("click", function() {
+        $(".nav-items").children("a").css("background-color", "#F8F8F8");
+        $(".nav-items").children("a").css("border", "1px solid #F8F8F8");
+        $(".nav-items").children("a").css("color", "black");
+        $(this).children("a").css("background-color", "#0275D8");
+        $(this).children("a").css("border", "1px solid #0275D8");
+        $(this).children("a").css("color", "#F8F8F8");
+        let x = document.getElementsByClassName("scrollNav-active");
+        if(x.length > 0) { x[0].classList.remove("scrollNav-active"); }
+        $(this).children("a").addClass("scrollNav-active");
+        document.getElementById($(this).attr("id").slice(5)).scrollIntoView({behavior: "instant"});
+    });
+    $("#wrapper").ready(function() {
+        $('.dish-cost').click(function(event) {
+
+            $(this).hide();
+            let cost = $(this).text().split(' ')[0];
+            $("#item-" + $(this).attr("id")).show();
+            $("#item-" + $(this).attr("id")).css("display", "flex");
+            $.ajax({
+                url: '/webapp/data',
+                type: 'POST',
+                data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[1], "quantity": 1, "method": "create"},
+                success: function(data) {
+                    $("#amount-btn-" + data.dish_id).html(data.quantity);
+                    amount += Number(cost);
+                    $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
+                    if ($(".elements").is(":visible")) {
+                        tg.MainButton.show();
+                        tg.MainButton.setParams({"text": "Корзина " + amount + " ₽"});
+                    }
+                },
+            });
         });
     });
-    Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        let params = "uid=" + tg.initDataUnsafe.user.id;
-        for (let key in cart) {
-            params += "&" + key + "=" + cart[key];
-        }
-        window.location = "/webapp_cart?" + params;
+    $(".plusminus").on("click", function() {
+        let operation = $(this).attr("id").split("-")[1];
+        $.ajax({
+            url: '/webapp/data',
+            type: 'POST',
+            data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[2], "quantity": 1, "method": "update",
+            "operation": operation},
+            success: function(data) {
+                let cost = $("#btn-" + data.dish_id).text().split(' ')[0];
+                $("#amount-btn-"+ data.dish_id).html(data.quantity);
+                if (operation == 'add') {
+                    amount += Number(cost)
+                } else {
+                    amount -= Number(cost)
+                }
+                if (data.quantity == 0) {
+                    $("#itemCard-" + data.dish_id).css("border-bottom", "no");
+                    $("#item-btn-" + data.dish_id).hide();
+                    $("#btn-" + data.dish_id).show();
+                    $("#itemCard-" + data.dish_id).css("border-bottom", "");
+                }
+                if ($(".elements").is(":visible")) {
+                    $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
+                    tg.MainButton.show();
+                    tg.MainButton.setParams({"text": "Корзина " + amount + " ₽"});
+                } else {
+                    $("#itemCard-" + data.dish_id).css("border-bottom", "");
+                    tg.MainButton.hide();
+                }
+            },
+        });
     });
+    let rest_id = $("#wrapper").attr("class").split(" ")[1].split("_")[1]
+    Telegram.WebApp.onEvent('mainButtonClicked', function(){
+        window.location = "/webapp_cart?uid=" + tg.initDataUnsafe.user.id + "&restId=" + rest_id;
+    });
+
 </script>
 </html>
