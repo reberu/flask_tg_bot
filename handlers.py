@@ -91,6 +91,8 @@ def restaurant_callback(call):
             )
             db.session.add(new_item)
             db.session.commit()
+            txt = "Вы добавили блюдо другого ресторана, корзина будет очищена"
+            BOT.answer_callback_query(callback_query_id=call.id, show_alert=False, text=txt)
         elif method == 'add' or 'rem' and dish_count > 1:
             cart_item.quantity += operation.get(method)
             db.session.commit()
@@ -117,7 +119,7 @@ def restaurant_callback(call):
             webapp = WebAppInfo(BASE_URL + f"webapp/{rest_id}?dishId={dish.id}&uid={call.from_user.id}")
             keyboard.row(
                 InlineKeyboardButton('Инфо', web_app=webapp_info),
-                InlineKeyboardButton('В меню ресторана', callback_data=f'rest_{rest_id}_menu')
+                # InlineKeyboardButton('В меню ресторана', callback_data=f'rest_{rest_id}_menu')
             )
             keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
             keyboard.add(InlineKeyboardButton(f'Добавить другие блюда', web_app=webapp))
@@ -678,7 +680,6 @@ def order_callback(call):
 def favorites_callback(call):
     data, txt = call.data.split('_'), ''
     rest_id, dish_id = int(data[3]) if data[2] == 'rest' else int(data[2]), int(data[3])
-    print(f'favorites callback\n{rest_id, dish_id}')
     favs = Favorites.query.filter_by(uid=int(data[1]), rest_id=rest_id).all()
     if data[2] != 'rest':
         txt = 'Блюдо удалено из избранного'

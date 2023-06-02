@@ -23,17 +23,18 @@
       <div class="btn plusminus" id="btn-rem">-</div>
       <div class="btn quantity" id="amount-btn-dish-id">1</div>
       <div class="btn plusminus" id="btn-add">+</div>
-      <button type="button" class="btn" id="btn-dish-cost">Добавить {{dish.cost}} ₽</button>
    </footer>
    <script>
    let tg = window.Telegram.WebApp;
-   tg.expand();
-   tg.BackButton.show();
-   let uid = tg.initDataUnsafe.user.id;
-<!--   let uid = 113737020;-->
    let cost = Number($('#hiddenCost').text());
    let restId = Number($('#hiddenId').text());
    let dishId = $('#hiddenDishId').text();
+   tg.expand();
+   tg.BackButton.show();
+   tg.MainButton.text = "Добавить " + cost + " ₽";
+   tg.MainButton.show();
+   let uid = tg.initDataUnsafe.user.id;
+<!--   let uid = 113737020;-->
    Telegram.WebApp.onEvent('backButtonClicked', function(){
         window.location = "/webapp/" + restId + "?dishId=" + dishId;
    });
@@ -41,15 +42,13 @@
    $('.plusminus').click(function() {
       let quantity = Number($('#amount-btn-dish-id').text());
       let op = $(this).attr('id').split('-')[1];
-      if (quantity + ops[op] >= 1) {
-         let count = quantity + ops[op];
+      let count = quantity + ops[op];
+      if (count >= 1) {
          $('#amount-btn-dish-id').html(count);
-         let currentCost = $('#btn-dish-cost').text().split(' ')[1]
-         let btnText = $('#btn-dish-cost').text().replace(currentCost, cost * count);
-         $('#btn-dish-cost').text(btnText);
+         tg.MainButton.setParams({"text": "Добавить " + cost * count + " ₽"});
       }
    });
-   $('#btn-dish-cost').click(function() {
+   Telegram.WebApp.onEvent('mainButtonClicked', function(){
       let dishId = $('div[id^="dish-id-"]').attr('id').split('-')[2];
       $.ajax({
          url: '/webapp/data',

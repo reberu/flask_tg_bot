@@ -65,7 +65,9 @@ def default_message(message):
     text = 'Не могу найти то, что Вы ищете🧐 Попробуйте изменить запрос😊'
     result, query = [], None
     for word in message.text.split(' '):
-        result.append(*db.session.query(SearchWords.id).filter(SearchWords.words.ilike("%" + word.lower() + "%")).first())
+        query = db.session.query(SearchWords.id).filter(SearchWords.words.ilike("%" + word.lower() + "%"))
+        temp = query.first() if len(word) > 1 else None
+        if temp: result.append(*temp)
     if result:
         query = db.session.query(Category.id, Restaurant.name, Dish.img_link, SearchDishes.dish_name, Dish.composition,
                                  Dish.cost, Dish.id, Restaurant.id).filter(
@@ -87,8 +89,8 @@ def default_message(message):
             )
             total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=message.chat.id).all()
             total = total[0][0] if total[0][0] else 0
-            kbd.add(InlineKeyboardButton('Меню ресторана', callback_data=f'rest_{item[7]}_menu'))
-            kbd.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
+            # kbd.add(InlineKeyboardButton('Меню ресторана', callback_data=f'rest_{item[7]}_menu'))
+            # kbd.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
             BOT.send_message(chat_id=message.chat.id, text=text, parse_mode='HTML', reply_markup=kbd)
 
         return 'Ok', 200
@@ -176,22 +178,15 @@ def combo(message):
         text = ''
         text += f'<b>Ресторан {item[1].name}</b>\nДоставка - ЗНАЧ!\nСамовывоз - {rest.address}\n'
         text += f'\n{item[0].name}\n{item[0].composition}\n{item[0].cost} р.\n<a href="{item[0].img_link}">.</a>'
-        quantity = 0
         cart_item = Cart.query.filter_by(user_uid=message.chat.id, dish_id=item[0].id).first()
-        if cart_item:
-            quantity = cart.quantity
+        quantity = cart_item.quantity if cart_item else 0
         cb_data = f'fav_{message.chat.id}_{item[1].id}_{item[0].id}'
         change_callback = f'rest_{item[1].id}_cat_{item[2].category_id}_dish_{item[0].id}'
         button1 = InlineKeyboardButton(text='⭐', callback_data=cb_data)
         button2 = InlineKeyboardButton(text='-', callback_data=f'{change_callback}_rem_{message.chat.id}')
         button3 = InlineKeyboardButton(text=f'{quantity} шт.', callback_data='None')
         button4 = InlineKeyboardButton(text='+', callback_data=f'{change_callback}_add_{message.chat.id}')
-        # total = 0
-        # for cart_item in cart:
-        #     total += cart_item.price
-        # cb_text = f'В корзину: заказ на сумму {total} р'
         keyboard.add(button1, button2, button3, button4)
-        # keyboard.add(InlineKeyboardButton(text=cb_text, callback_data='cart'))
         BOT.send_message(chat_id=message.chat.id, text=text, parse_mode='HTML', reply_markup=keyboard)
     write_history(message.id, message.chat.id, text, is_bot=True)
 
@@ -286,20 +281,19 @@ def send_help(message):
 def new_msg(message):
     """Обработка текстовых сообщений"""
     options = {
-        "Рестораны": rest_menu_send_msg,
-        "Комбо Наборы (КБ)": combo,
-        "Рекомендуем": recommend,
-        "Акции": promotions,
-        "Корзина": show_cart,
-        "Статистика": stat_menu_keyboard,
+        "рестораны": rest_menu_send_msg,
+        "комбо наборы (кб)": combo,
+        "рекомендуем": recommend,
+        "акции": promotions,
+        "корзина": show_cart,
+        "статистика": stat_menu_keyboard,
     }
-    options.get(message.text, default_message)(message)
+    options.get(message.text.lower(), default_message)(message)
 
 
 @BOT.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     """Обработка колбэков"""
-    print(call.data)
     req = call.data.split('_')
     options = {
         'rest': restaurant_callback,
@@ -486,7 +480,7 @@ def webapp_data():
         rest = Restaurant.query.filter_by(id=rest_id).first()
         text = 'Вы указали:\n'
         text += f'Адрес доставки: {address}\n' if method == 'delivery' else 'Самовывоз\n'
-        text += f'Контактный номер: {phone}\nСумма заказа: {total}'
+        text += f'Контактный номер: {phone}\nСумма заказа: {total}\n'
         text += f'Заказ отправлен, ждите ответа ресторана {rest.name}. ' \
                 'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
         BOT.send_message(chat_id=uid, text=text)

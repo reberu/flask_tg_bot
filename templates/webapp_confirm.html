@@ -104,8 +104,8 @@
     $("#input-address").on("input", function() {
       address = $(this).val();
     });
+    params =  "&method=" + method + "&payment=" + payment + "&phone=" + phone + "&address=" + address + "&total=" + total;
     Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        params =  "&method=" + method + "&payment=" + payment + "&phone=" + phone + "&address=" + address + "&total=" + total;
         window.location = "/webapp/data?uid=" + tg.initDataUnsafe.user.id + params;
         tg.close();
     });

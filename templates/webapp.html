@@ -58,12 +58,10 @@
     tg.MainButton.text = "Корзина";
     tg.MainButton.textColor = "#FFFFFF";
     tg.MainButton.color = "#0275D8";
-    if ($(".elements").is(":visible")) {
-        tg.MainButton.show();
-    }
+    tg.MainButton.show();
     tg.BackButton.hide();
-    let uid = tg.initDataUnsafe.user.id;
-<!--    let uid = 113737020;-->
+<!--    let uid = tg.initDataUnsafe.user.id;-->
+    let uid = 113737020;
     let dishId = $("#hiddenDishId").text()
     let amount = 0;
     $(document).ready(function(){
@@ -87,16 +85,14 @@
                     }
                     tg.MainButton.setText("Корзина " + amount + " ₽");
                 }
-                if ($(".elements").is(":visible")) {
-                    tg.MainButton.show();
-                } else {
-                    tg.MainButton.hide();
-                }
             }
         });
         if (dishId != "None") {
             let el = document.getElementById("itemCard-" + dishId);
             el.scrollIntoView();
+<!--            window.scrollBy(0, 5 * window.innerHeight/100);-->
+            let topBarVertSize = -36;
+            window.scrollBy(0, topBarVertSize);
         }
     });
     $('img[id^="img-item-"]').click(function(){
@@ -135,10 +131,7 @@
                     $("#amount-btn-" + data.dish_id).html(data.quantity);
                     amount += Number(cost);
                     $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
-                    if ($(".elements").is(":visible")) {
-                        tg.MainButton.show();
-                        tg.MainButton.setParams({"text": "Корзина " + amount + " ₽"});
-                    }
+                    tg.MainButton.setParams({"text": "Корзина " + amount + " ₽"});
                 },
             });
         });
@@ -163,14 +156,10 @@
                     $("#item-btn-" + data.dish_id).hide();
                     $("#btn-" + data.dish_id).show();
                     $("#itemCard-" + data.dish_id).css("border-bottom", "");
-                }
-                if ($(".elements").is(":visible")) {
-                    $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
-                    tg.MainButton.show();
-                    tg.MainButton.setParams({"text": "Корзина " + amount + " ₽"});
+                    tg.MainButton.setParams({"text": "Корзина"});
                 } else {
-                    $("#itemCard-" + data.dish_id).css("border-bottom", "");
-                    tg.MainButton.hide();
+                  $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
+                  tg.MainButton.setParams({"text": "Корзина " + amount + " ₽"});
                 }
             },
         });
