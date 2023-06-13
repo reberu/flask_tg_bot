@@ -84,6 +84,8 @@ def restaurant_callback(call):
                 Cart.query.filter(
                     Cart.user_uid == call.from_user.id, Cart.restaurant_id.notlike(rest.id)
                 ).delete(synchronize_session=False)
+                txt = "Вы добавили блюдо другого ресторана, корзина будет очищена"
+                BOT.answer_callback_query(callback_query_id=call.id, show_alert=False, text=txt)
             new_item = Cart(
                 name=dish.name, price=dish.cost, quantity=1, user_uid=call.from_user.id,
                 is_dish=1, is_water=0, dish_id=dish.id, restaurant_id=rest_id,
@@ -91,8 +93,6 @@ def restaurant_callback(call):
             )
             db.session.add(new_item)
             db.session.commit()
-            txt = "Вы добавили блюдо другого ресторана, корзина будет очищена"
-            BOT.answer_callback_query(callback_query_id=call.id, show_alert=False, text=txt)
         elif method == 'add' or 'rem' and dish_count > 1:
             cart_item.quantity += operation.get(method)
             db.session.commit()
@@ -389,6 +389,7 @@ def cart_callback(call):
 
 def order_callback(call):
     data = call.data.split('_')
+    print(data)
 
     def order_confirm():
         cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
@@ -408,10 +409,9 @@ def order_callback(call):
             order_state="Заказ отправлен, ожидание ответа ресторана."
         )
         db.session.add(new_order)
-        txt = f'Заказ отправлен, ждите ответа ресторана {rstrnt.name}.' \
+        txt = f'Заказ отправлен, ждите ответа ресторана {rstrnt.name}.\n' \
               'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
         BOT.send_message(chat_id=call.from_user.id, text=txt)
-        write_history(call.message.id, call.from_user.id, txt, True)
         user = User.query.filter_by(uid=new_order.uid).first()
         txt = f'Поступил заказ № {new_order.id}\nСостав заказа:\n'
         for item in cart:
@@ -431,7 +431,7 @@ def order_callback(call):
         kbd = InlineKeyboardMarkup()
         d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
         for item in d:
-            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}'))
+            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}_send'))
         kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
         kbd.add(InlineKeyboardButton(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
         Cart.query.filter_by(user_uid=call.from_user.id).delete()
@@ -528,7 +528,7 @@ def order_callback(call):
             bt_text = "Принять и доставить "
             opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
             for i in opts:
-                kbd.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
+                kbd.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}_send'))
             kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
             kbd.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
             user_id = rest.service_uid
@@ -631,7 +631,7 @@ def order_callback(call):
             kbd.add(InlineKeyboardButton(text='Принять', callback_data=f'order_{order.id}_accept_0_{data[4]}'))
             kbd.add(InlineKeyboardButton(text='Отменить', callback_data=f'order_{order.id}_change'))
         elif data[2] == 'accept':
-            time = int(data[4])
+            time = int(data[3])
             pattern = r'(.[0-2][0-9]:[0-5][0-9](.*)[0-2][0-9]:[0-5][0-9])|' \
                       r'(.[а-яА-Я][a-яА-Я]-[а-яА-Я][a-яА-Я].[0-2][0-9]:[0-5][0-9](.*)[0-2][0-9]:[0-5][0-9])'
             rest_name = re.sub(pattern, '', rest.name)

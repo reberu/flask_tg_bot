@@ -60,8 +60,8 @@
     tg.MainButton.color = "#0275D8";
     tg.MainButton.show();
     tg.BackButton.hide();
-<!--    let uid = tg.initDataUnsafe.user.id;-->
-    let uid = 113737020;
+    let uid = tg.initDataUnsafe.user.id;
+<!--    let uid = 113737020;-->
     let dishId = $("#hiddenDishId").text()
     let amount = 0;
     $(document).ready(function(){
@@ -84,25 +84,27 @@
                         $("#itemCard-" + key).css("border-bottom", "thick double #0275D8");
                     }
                     tg.MainButton.setText("Корзина " + amount + " ₽");
+
+                }
+                if (dishId != "None") {
+                  let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
+                  let vh = window.innerHeight * 0.06;
+                  window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
                 }
             }
         });
-        if (dishId != "None") {
-            let el = document.getElementById("itemCard-" + dishId);
-            el.scrollIntoView();
-<!--            window.scrollBy(0, 5 * window.innerHeight/100);-->
-            let topBarVertSize = -36;
-            window.scrollBy(0, topBarVertSize);
-        }
+
     });
+
+
     $('img[id^="img-item-"]').click(function(){
         let category = "category-" + $(this).parent().attr("class").split("-")[2];
         let itemId = $(this).attr("id").split("-")[2];
-        window.location.href = "/webapp_item?uid=" + uid + "&item=" + itemId + "&category=" + category;
+        window.open("/webapp_item?uid=" + uid + "&item=" + itemId + "&category=" + category, "_self");
     });
     $(".terms").click(function(){
         let rest_id = $("#wrapper").attr("class").split('_')[1]
-        window.location = "/webapp_rest/" + rest_id;
+        window.open("/webapp_rest/" + rest_id, "_self");
     });
     $(".nav-items").on("click", function() {
         $(".nav-items").children("a").css("background-color", "#F8F8F8");
@@ -166,7 +168,7 @@
     });
     let rest_id = $("#wrapper").attr("class").split(" ")[1].split("_")[1]
     Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        window.location = "/webapp_cart?uid=" + tg.initDataUnsafe.user.id + "&restId=" + rest_id;
+        window.open("/webapp_cart?uid=" + tg.initDataUnsafe.user.id + "&restId=" + rest_id, "_self");
     });
 
 </script>

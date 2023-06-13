@@ -43,7 +43,7 @@ requests.get(SET_WEBHOOK)
 def rest_menu_send_msg(chat_id):
     if type(chat_id) is Message:
         chat_id = chat_id.chat.id
-    markup = rest_menu_keyboard()
+    markup = rest_menu_keyboard(chat_id)
     if not markup.keyboard:
         text = 'В данное время нет работающих ресторанов'
         BOT.send_message(chat_id=chat_id, text=text)
@@ -161,7 +161,7 @@ def combo(message):
     text = 'Здесь представлены лучшие Комбо Наборы разных ресторанов:'
     BOT.send_message(message.chat.id, text)
     write_history(message.id, message.chat.id, text, is_bot=True)
-    kb = rest_menu_keyboard()
+    kb = rest_menu_keyboard(message.chat.id)
     rests = []
     kb_parsed = list(chain.from_iterable(kb.keyboard))
     for item in kb_parsed:
@@ -340,7 +340,7 @@ def webapp_main(Number):
     try:
         uid = int(request.args.get('uid'))
     except Exception as e:
-        print("Exception is:", e)
+        print("Exception of int(request.args.get('uid')) is:", e)
         uid = None
     rest = Restaurant.query.filter_by(id=Number).first()
     if Cart.query.filter(Cart.user_uid == uid, Cart.restaurant_id.notlike(rest.id)).all():

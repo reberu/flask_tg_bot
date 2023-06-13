@@ -35,7 +35,7 @@ def write_history(msg_id, chat_id, text, is_bot):
     db.session.commit()
 
 
-def rest_menu_keyboard():
+def rest_menu_keyboard(uid):
     """Возвращает меню с наименованиями ресторанов"""
 
     def is_time_between(begin_time, ending_time, check_time=None):
@@ -53,7 +53,7 @@ def rest_menu_keyboard():
     for restaurant in restaurants:
         if not restaurant.enabled:
             continue
-        webapp = WebAppInfo(BASE_URL + f"webapp/{restaurant.id}")
+        webapp = WebAppInfo(BASE_URL + f"webapp/{restaurant.id}?uid={uid}")
         if match := re.search(pattern, restaurant.name, re.IGNORECASE):
             if ' ' not in match.group(1):
                 start_time = datetime.strptime(match.group(1).split('-')[0], '%H:%M').time()

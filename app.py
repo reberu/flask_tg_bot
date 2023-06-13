@@ -12,18 +12,21 @@ from email.mime.text import MIMEText
 def send_email(host, subject, text):
     smtp_server = "smtp.office365.com"
     user = "robofood1bot@outlook.com"
-    pswd = "deliveryfoodrobot1bot"
+    pswd = "Gps888Rcb"
     port = 587
     msg = MIMEMultipart()
     msg['Subject'] = subject
     msg['From'] = user
     msg['To'] = host
     msg.attach(MIMEText(text, 'plain'))
-    with smtplib.SMTP(smtp_server, port) as server:
-        server.starttls()
-        server.login(user, pswd)
-        server.send_message(msg)
-        server.quit()
+    try:
+        with smtplib.SMTP(smtp_server, port) as server:
+            server.starttls()
+            server.login(user, pswd)
+            server.send_message(msg)
+            server.quit()
+    except Exception as e:
+        print('oops: ', e)
 
 
 app = Flask(__name__)

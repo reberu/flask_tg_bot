@@ -36,7 +36,7 @@
    let uid = tg.initDataUnsafe.user.id;
 <!--   let uid = 113737020;-->
    Telegram.WebApp.onEvent('backButtonClicked', function(){
-        window.location = "/webapp/" + restId + "?dishId=" + dishId;
+        window.location = "/webapp/" + restId + "?dishId=" + dishId + "&uid=" + uid;
    });
    let ops = {'add': 1, 'rem': -1};
    $('.plusminus').click(function() {
@@ -55,7 +55,7 @@
          type: 'POST',
          data: {"uid": uid, "dish_id": dishId, "quantity": $('#amount-btn-dish-id').text(), "method": "add"},
          success: function(data) {
-            window.location.href = "/webapp/" + restId + "?dishId=" + dishId;
+            window.location.href = "/webapp/" + restId + "?dishId=" + dishId + "&uid=" + uid;
          },
       });
    });
