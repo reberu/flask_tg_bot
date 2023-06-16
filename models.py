@@ -192,3 +192,16 @@ class SearchDishes(db.Model):
     dish_category = db.Column(db.String(), db.ForeignKey('categories.name'))
     rest_id = db.Column(db.Integer(), db.ForeignKey('restaurants.id'))
     search_words_id = db.Column(db.Integer(), db.ForeignKey('search_words.id'))
+
+
+class TextMenuMessage(db.Model):
+    __tablename__ = 'text_menu_message'
+    id = db.Column(db.Integer(), primary_key=True)
+    user_id = db.Column(db.Integer())
+    message_id = db.Column(db.Integer())
+    rest_id = db.Column(db.Integer())
+    text = db.Column(db.Text())
+    img = db.Column(db.Text())
+    category_id = db.Column(db.Integer())
+    dish_id = db.Column(db.Integer())
+    quantity = db.Column(db.Integer())

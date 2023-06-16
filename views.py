@@ -1,9 +1,11 @@
+import json
 import os
 from datetime import datetime
 from itertools import chain
 from os import mkdir
 from os.path import isdir
 
+import telebot.types
 from PIL import Image
 from flask import render_template, flash, redirect, url_for, abort, send_from_directory
 from sqlalchemy import func
@@ -31,7 +33,8 @@ from flask_login import login_required, login_user, current_user, logout_user
 from app import app, db, login_manager, send_email
 
 from models import Restaurant, Category, Dish, Cart, User, Order, History, OrderDetail, Admin, \
-    RestaurantDeliveryTerms, Subcategory, SpecialDish, PromoDish, Favorites, SearchWords, SearchDishes, RestaurantInfo
+    RestaurantDeliveryTerms, Subcategory, SpecialDish, PromoDish, Favorites, SearchWords, SearchDishes, RestaurantInfo, \
+    TextMenuMessage
 
 from werkzeug.utils import secure_filename
 
@@ -50,6 +53,7 @@ def rest_menu_send_msg(chat_id):
     else:
         text = 'Пожалуйста, выберите ресторан:'
         BOT.send_message(chat_id=chat_id, text=text, reply_markup=markup)
+        telebot.TeleBot.edit_message_text()
 
 
 def stat_menu_keyboard(message):
@@ -70,12 +74,15 @@ def default_message(message):
         if temp: result.append(*temp)
     if result:
         query = db.session.query(Category.id, Restaurant.name, Dish.img_link, SearchDishes.dish_name, Dish.composition,
-                                 Dish.cost, Dish.id, Restaurant.id).filter(
+                                 Dish.cost, Dish.id, Restaurant.id, Restaurant.address).filter(
             SearchDishes.search_words_id.in_(result)).filter(
             Restaurant.id == SearchDishes.rest_id, Dish.id == SearchDishes.dish_id).filter(
             Category.name == SearchDishes.dish_category, Category.restaurant_id == SearchDishes.rest_id).all()
+        if TextMenuMessage.query.filter_by(user_id=message.chat.id).all():
+            TextMenuMessage.query.filter_by(user_id=message.chat.id).delete()
         for item in query:
-            text = f'{item[1]}\n<a href="{item[2]}">.</a>\n{item[3]}\n{item[4]}\n{item[5]} р.'
+            text = f'<b>{item[1]}</b>\nДоставка - ЗНАЧ!\nСамовывоз - {item[8]}\n\n'
+            text += f'{item[3]}\n{item[4]}\n{item[5]} р.\n<a href="{item[2]}">.</a>'
             cart = Cart.query.filter_by(user_uid=message.chat.id, dish_id=item[6]).first()
             quantity = cart.quantity if cart else 0
             cb_data = f'rest_{item[7]}_cat_{item[0]}_dish_{item[6]}'
@@ -91,8 +98,13 @@ def default_message(message):
             total = total[0][0] if total[0][0] else 0
             # kbd.add(InlineKeyboardButton('Меню ресторана', callback_data=f'rest_{item[7]}_menu'))
             # kbd.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
-            BOT.send_message(chat_id=message.chat.id, text=text, parse_mode='HTML', reply_markup=kbd)
-
+            msg = BOT.send_message(chat_id=message.chat.id, text=text, parse_mode='HTML', reply_markup=kbd)
+            txt_menu = TextMenuMessage(
+                user_id=message.chat.id, message_id=msg.id, rest_id=item[7], text=text, img=item[2],
+                category_id=item[0], dish_id=item[6], quantity=quantity
+            )
+            db.session.add(txt_menu)
+            db.session.commit()
         return 'Ok', 200
     result = Restaurant.query.filter_by(passwd=message.text).first()
     if result:
@@ -159,9 +171,10 @@ def restaurants(message):
 @BOT.message_handler(commands=['combo_set'])
 def combo(message):
     text = 'Здесь представлены лучшие Комбо Наборы разных ресторанов:'
-    BOT.send_message(message.chat.id, text)
-    write_history(message.id, message.chat.id, text, is_bot=True)
-    kb = rest_menu_keyboard(message.chat.id)
+    chat_id = message.chat.id
+    BOT.send_message(chat_id, text)
+    write_history(message.id, chat_id, text, is_bot=True)
+    kb = rest_menu_keyboard(chat_id)
     rests = []
     kb_parsed = list(chain.from_iterable(kb.keyboard))
     for item in kb_parsed:
@@ -171,24 +184,31 @@ def combo(message):
     ).filter(SpecialDish.subcat_id == -1).filter(
         SpecialDish.dish_id == Dish.id, SpecialDish.rest_id == Restaurant.id, Restaurant.name.in_(rests)
     ).all()
-    cart = Cart.query.filter_by(user_uid=message.chat.id).all()
+    if TextMenuMessage.query.filter_by(user_id=chat_id).all():
+        TextMenuMessage.query.filter_by(user_id=chat_id).delete()
     for item in combo_dishes:
         rest = Restaurant.query.filter_by(id=item[0].id_rest).first()
         keyboard = InlineKeyboardMarkup(row_width=4)
         text = ''
         text += f'<b>Ресторан {item[1].name}</b>\nДоставка - ЗНАЧ!\nСамовывоз - {rest.address}\n'
         text += f'\n{item[0].name}\n{item[0].composition}\n{item[0].cost} р.\n<a href="{item[0].img_link}">.</a>'
-        cart_item = Cart.query.filter_by(user_uid=message.chat.id, dish_id=item[0].id).first()
+        cart_item = Cart.query.filter_by(user_uid=chat_id, dish_id=item[0].id).first()
         quantity = cart_item.quantity if cart_item else 0
-        cb_data = f'fav_{message.chat.id}_{item[1].id}_{item[0].id}'
+        cb_data = f'fav_{chat_id}_{item[1].id}_{item[0].id}'
         change_callback = f'rest_{item[1].id}_cat_{item[2].category_id}_dish_{item[0].id}'
         button1 = InlineKeyboardButton(text='⭐', callback_data=cb_data)
-        button2 = InlineKeyboardButton(text='-', callback_data=f'{change_callback}_rem_{message.chat.id}')
+        button2 = InlineKeyboardButton(text='-', callback_data=f'{change_callback}_rem_{chat_id}')
         button3 = InlineKeyboardButton(text=f'{quantity} шт.', callback_data='None')
-        button4 = InlineKeyboardButton(text='+', callback_data=f'{change_callback}_add_{message.chat.id}')
+        button4 = InlineKeyboardButton(text='+', callback_data=f'{change_callback}_add_{chat_id}')
         keyboard.add(button1, button2, button3, button4)
-        BOT.send_message(chat_id=message.chat.id, text=text, parse_mode='HTML', reply_markup=keyboard)
-    write_history(message.id, message.chat.id, text, is_bot=True)
+        msg = BOT.send_message(chat_id=chat_id, text=text, parse_mode='HTML', reply_markup=keyboard)
+        txt_menu = TextMenuMessage(
+            user_id=chat_id, message_id=msg.id, rest_id=rest.id, text=text, img=item[0].img_link,
+            category_id=item[2].category_id, dish_id=item[0].id, quantity=quantity
+        )
+        db.session.add(txt_menu)
+        db.session.commit()
+        write_history(message.id, chat_id, text, is_bot=True)
 
 
 @BOT.message_handler(commands=['recommend'])
@@ -486,6 +506,8 @@ def webapp_data():
         BOT.send_message(chat_id=uid, text=text)
         last_order = db.engine.execute("SELECT MAX(id) FROM Orders;").first()[0]
         user = User.query.filter_by(uid=uid).first()
+        user.address = address
+        user.phone = phone
         new_order = Order(
             id=last_order + 1,
             uid=uid,
@@ -512,11 +534,11 @@ def webapp_data():
         text += f'Общая сумма заказа: {total} р.\n'
         bt_label = "Принять и доставить "
         cb_data = f'order_{new_order.id}_change'
-        text += f'Адрес доставки {user.address}\nПерейдите в чат-бот, чтобы обработать заказ https://t.me/robofood1bot'
+        text += f'Адрес доставки {user.address}\n'
         kbd = InlineKeyboardMarkup()
         d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
         for item in d:
-            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}'))
+            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}_send'))
         kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
         kbd.add(InlineKeyboardButton(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
         Cart.query.filter_by(user_uid=uid).delete()
