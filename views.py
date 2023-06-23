@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import datetime
 from itertools import chain
@@ -81,7 +82,10 @@ def default_message(message):
         if TextMenuMessage.query.filter_by(user_id=message.chat.id).all():
             TextMenuMessage.query.filter_by(user_id=message.chat.id).delete()
         for item in query:
-            text = f'<b>{item[1]}</b>\nДоставка - ЗНАЧ!\nСамовывоз - {item[8]}\n\n'
+            rest_info = RestaurantInfo.query.filter_by(rest_id=item[7]).first()
+            delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'
+            takeaway_address = rest_info.takeaway_address if rest_info else item[8]
+            text = f'<b>{item[1]}</b>\nДоставка - {delivery_time}\nСамовывоз - {takeaway_address}\n\n'
             text += f'{item[3]}\n{item[4]}\n{item[5]} р.\n<a href="{item[2]}">.</a>'
             cart = Cart.query.filter_by(user_uid=message.chat.id, dish_id=item[6]).first()
             quantity = cart.quantity if cart else 0
@@ -116,9 +120,9 @@ def default_message(message):
 
 @app.route('/', methods=['POST'])
 def webhook():
-    update = Update.de_json(request.stream.read().decode('utf-8'))
-    BOT.process_new_updates([update])
     try:
+        update = Update.de_json(request.stream.read().decode('utf-8'))
+        BOT.process_new_updates([update])
         check_user(update.message.json)
         write_history(
             msg_id=update.message.json["message_id"],
@@ -126,8 +130,8 @@ def webhook():
             text=update.message.json["text"],
             is_bot=False
         )
-    except AttributeError:
-        pass
+    except Exception as e:
+        print("app route / error: ", e)
     return 'Ok', 200
 
 
@@ -188,9 +192,12 @@ def combo(message):
         TextMenuMessage.query.filter_by(user_id=chat_id).delete()
     for item in combo_dishes:
         rest = Restaurant.query.filter_by(id=item[0].id_rest).first()
+        rest_info = RestaurantInfo.query.filter_by(rest_id=rest.id).first()
+        delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'
+        takeaway_address = rest_info.takeaway_address if rest_info else rest.address
         keyboard = InlineKeyboardMarkup(row_width=4)
         text = ''
-        text += f'<b>Ресторан {item[1].name}</b>\nДоставка - ЗНАЧ!\nСамовывоз - {rest.address}\n'
+        text += f'<b>Ресторан {item[1].name}</b>\nДоставка - {delivery_time}\nСамовывоз - {takeaway_address}\n'
         text += f'\n{item[0].name}\n{item[0].composition}\n{item[0].cost} р.\n<a href="{item[0].img_link}">.</a>'
         cart_item = Cart.query.filter_by(user_uid=chat_id, dish_id=item[0].id).first()
         quantity = cart_item.quantity if cart_item else 0
@@ -229,7 +236,7 @@ def promotions(message):
     keyboard = InlineKeyboardMarkup()
     for dish in promo_dishes:
         text = f'<a href="{dish.img_link}">.</a>'
-        cb_data = f'restaurant_{dish.rest_id}'
+        cb_data = f'rest_{dish.rest_id}'
         keyboard.add(InlineKeyboardButton(text="Меню ресторана", callback_data=cb_data))
         BOT.send_message(chat_id=message.chat.id, text=text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -315,6 +322,7 @@ def new_msg(message):
 def callback_query(call):
     """Обработка колбэков"""
     req = call.data.split('_')
+    logging.log(logging.INFO, req)
     options = {
         'rest': restaurant_callback,
         'cart': cart_callback,
@@ -544,7 +552,7 @@ def webapp_data():
         Cart.query.filter_by(user_uid=uid).delete()
         db.session.commit()
         del cart
-        BOT.send_message(chat_id=uid, text=text, reply_markup=kbd, parse_mode='HTML')
+        BOT.send_message(chat_id=rest.service_uid, text=text, reply_markup=kbd, parse_mode='HTML')
         send_email(rest.email, f'Поступил заказ из Robofood № {new_order.id}', text)
         return 'Ok', 200
 
@@ -1082,9 +1090,15 @@ def admin():
             delivery_time = restaurant_info_form.delivery_time.data
             takeaway_address = restaurant_info_form.takeaway_address.data
             try:
-                db.session.add(
-                    RestaurantInfo(rest_id=rest_id, img=img_link,
-                                   delivery_time=delivery_time, takeaway_address=takeaway_address))
+                rest_info = RestaurantInfo.query.filter_by(rest_id=rest_id).first()
+                if rest_info:
+                    rest_info.img = img_link if img_link else rest_info.img
+                    rest_info.delivery_time = delivery_time
+                    rest_info.takeaway_address = takeaway_address
+                else:
+                    db.session.add(
+                        RestaurantInfo(rest_id=rest_id, img=img_link,
+                                       delivery_time=delivery_time, takeaway_address=takeaway_address))
                 db.session.commit()
             except Exception as e:
                 flash(e)

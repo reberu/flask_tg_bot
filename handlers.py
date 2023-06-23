@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 
@@ -6,7 +7,7 @@ from telebot import formatting
 from telebot.types import InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB, WebAppInfo
 from app import db, send_email
 from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites, \
-    SpecialDish, TextMenuMessage as Menu
+    SpecialDish, TextMenuMessage as Menu, RestaurantInfo, TextMenuMessage
 from models import OrderDetail as OD
 from settings import BOT, YKT, RULES, BASE_URL
 from utils import rest_menu_keyboard, write_history
@@ -14,6 +15,7 @@ from utils import rest_menu_keyboard, write_history
 
 def restaurant_callback(call):
     data = call.data.split('_')
+    logging.log(logging.INFO, f'rest_callback {data}')
     rest_id = int(data[1])
     categories = Category.query.filter_by(restaurant_id=rest_id)
     rest = Restaurant.query.filter_by(id=rest_id).first()
@@ -52,8 +54,11 @@ def restaurant_callback(call):
         # total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         # total = total[0][0] if total[0][0] else 0
         for dish in dishes:
+            rest_info = RestaurantInfo.query.filter_by(rest_id=rest.id).first()
+            delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'
+            takeaway_address = rest_info.takeaway_address if rest_info else rest.address
             keyboard = IKM()
-            text = f'{rest.name}\nДоставка - ЗНАЧ!\nСамовывоз - {rest.address}\n\n<b>{dish.name}</b>' \
+            text = f'{rest.name}\nДоставка - {delivery_time}\nСамовывоз - {takeaway_address}\n\n<b>{dish.name}</b>' \
                    f'\n{dish.composition}\n{dish.cost} ₽\n<a href="{dish.img_link}">.</a>'
             dish_count = db.session.query(Cart.quantity).filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
             dish_count = dish_count[0] if dish_count else 0
@@ -600,7 +605,7 @@ def order_callback(call):
             db.session.commit()
             details = OD.query.filter_by(order_id=order.id).all()
             if not details:
-                markup = rest_menu_keyboard()
+                markup = rest_menu_keyboard(user_id)
                 txt = f'Ресторан {rest.name} отменил заказ. Пожалуйста, выберите ресторан:'
                 if not markup.keyboard:
                     txt = f'Ресторан {rest.name} отменил заказ. В данное время нет работающих ресторанов'
@@ -664,7 +669,7 @@ def order_callback(call):
                 kbd.add(IKB(text=f'Изменить заказ № {order.id}', callback_data=cb_data))
             state = 'самовывоз' if time == 0 else 'доставка'
             order.order_state = 'Заказ принят рестораном, ' + state
-            order.order_state += txt[53:] if time != 0 else ''
+            order.order_state += txt[53:] + time_txt if time != 0 else ''
             client = User.query.filter_by(uid=order.uid).first()
             txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
@@ -672,7 +677,7 @@ def order_callback(call):
             txt += f'Адрес доставки: {client.address}' if time != 0 else f'Самовывоз, {time_txt}'
             BOT.edit_message_text(text=txt, chat_id=user_id, message_id=call.message.id, reply_markup=kbd)
             txt = f'Мы оповестили клиента, что Вы приняли заказ № {order.id}'
-            txt += f', доставка {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз, {time_txt}'
+            txt += f', доставка в течении {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз, {time_txt}'
             txt += f'Контактный номер: {client.phone}'
             kbd = None
             db.session.commit()
@@ -735,7 +740,7 @@ def other_callback(call):
             chat_id=data.from_user.id,
             message_id=data.message.message_id,
             text=text,
-            reply_markup=rest_menu_keyboard()
+            reply_markup=rest_menu_keyboard(data.from_user.id)
         )
 
     def back_to_rest_promo(data):
@@ -769,8 +774,11 @@ def other_callback(call):
                                                 SpecialDish.rest_id == Restaurant.id,
                                                 SpecialDish.dish_id == Dish.id).all()
             for item in query:
+                rest_info = RestaurantInfo.query.filter_by(rest_id=item[0]).first()
+                delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'
+                takeaway_address = rest_info.takeaway_address if rest_info else item[8]
                 kbd = IKM()
-                text = f'<b>{item[1]}</b>\nДоставка - ЗНАЧ!\nСамовывоз - {item[8]}\n\n'
+                text = f'<b>{item[1]}</b>\nДоставка - {delivery_time}\nСамовывоз - {takeaway_address}\n\n'
                 text += f'{item[2]}\n{item[3]}\n{item[4]} р.\n<a href="{item[5]}">.</a>\n'
                 cart = Cart.query.filter_by(user_uid=uid, dish_id=item[6]).first()
                 quantity = cart.quantity if cart else 0
@@ -786,7 +794,13 @@ def other_callback(call):
                 #     user_uid=call.from_user.id).all()
                 # total = total[0][0] if total[0][0] else 0
                 # kbd.add(IKB(text=f'В корзину: заказ на сумму {total} р', callback_data='cart'))
-                BOT.send_message(chat_id=uid, text=text, parse_mode='HTML' if kbd else None, reply_markup=kbd)
+                msg = BOT.send_message(chat_id=uid, text=text, parse_mode='HTML' if kbd else None, reply_markup=kbd)
+                txt_menu = TextMenuMessage(
+                    user_id=uid, message_id=msg.id, rest_id=item[0], text=text, img=item[5],
+                    category_id=item[7], dish_id=item[6], quantity=quantity
+                )
+                db.session.add(txt_menu)
+                db.session.commit()
             return 'Ok', 200
         elif callback[0] == 'user':
             order = Order.query.filter_by(uid=uid).order_by(Order.id.desc()).first()

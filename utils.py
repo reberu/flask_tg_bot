@@ -1,3 +1,6 @@
+import logging
+import sys
+from logging.handlers import RotatingFileHandler
 import re
 
 from telebot import types
@@ -7,6 +10,17 @@ from app import db
 from models import User, History, Restaurant, Order
 from datetime import datetime
 from settings import YKT, MONTHS, BASE_URL
+
+
+def setup_logger():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s",
+        handlers=[
+            logging.FileHandler("restobot.log"),
+            logging.StreamHandler(stream=sys.stdout)
+        ]
+    )
 
 
 def check_user(msg):
