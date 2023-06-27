@@ -605,12 +605,12 @@ def order_callback(call):
             db.session.commit()
             details = OD.query.filter_by(order_id=order.id).all()
             if not details:
-                markup = rest_menu_keyboard(user_id)
+                markup = rest_menu_keyboard(order.uid)
                 txt = f'Ресторан {rest.name} отменил заказ. Пожалуйста, выберите ресторан:'
                 if not markup.keyboard:
                     txt = f'Ресторан {rest.name} отменил заказ. В данное время нет работающих ресторанов'
                     markup = None
-                BOT.send_message(chat_id=user_id, text=txt, reply_markup=markup)
+                BOT.send_message(chat_id=order.uid, text=txt, reply_markup=markup)
                 order.order_state = 'Заказ отменен'
                 db.session.commit()
                 txt = 'Заказ отменен, клиенту направлено соответствующее сообщение'

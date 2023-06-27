@@ -163,7 +163,7 @@ def stat3():
 
 
 def stat4():
-    orders = Order.query.filter_by(order_state="Отменен").all()
+    orders = Order.query.filter((Order.order_state == "Отменен") | (Order.order_state == "Заказ отменен")).all()
     text = f'Всего отмененных заказов: {len(orders)}\n'
     for order in orders:
         text += Restaurant.query.filter_by(id=order.order_rest_id).first().name
