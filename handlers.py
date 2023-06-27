@@ -573,7 +573,7 @@ def order_callback(call):
             db.session.commit()
             cart = Cart.query.filter_by(user_uid=order.uid).all()
             txt = f'Клиент решил изменить заказ № {order.id}. Номер заказа будет изменен.'
-            BOT.send_message(chat_id=call.from_user.id, text=txt)
+            BOT.send_message(chat_id=rest.service_uid, text=txt)
             kbd = IKM()
             row = [IKB(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in
                    enumerate(cart, start=1)]
