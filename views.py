@@ -233,11 +233,11 @@ def recommend(message):
 @BOT.message_handler(commands=['promotions'])
 def promotions(message):
     promo_dishes = PromoDish.query.all()
-    keyboard = InlineKeyboardMarkup()
     for dish in promo_dishes:
+        wa = WebAppInfo(BASE_URL + f"webapp/{dish.rest_id}?uid={message.chat.id}")
+        keyboard = InlineKeyboardMarkup()
         text = f'<a href="{dish.img_link}">.</a>'
-        cb_data = f'rest_{dish.rest_id}'
-        keyboard.add(InlineKeyboardButton(text="Меню ресторана", callback_data=cb_data))
+        keyboard.add(InlineKeyboardButton(text="Меню ресторана", web_app=wa))
         BOT.send_message(chat_id=message.chat.id, text=text, parse_mode="HTML", reply_markup=keyboard)
 
 
