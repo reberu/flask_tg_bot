@@ -1,129 +1,677 @@
 <!DOCTYPE html>
-<html>
-{% set log = logs|last %}
-{% set ns = namespace (rest_id = log.message_text|int, uid = log.chat_id) %}
+<html lang="ru">
 <head>
    <meta charset="UTF-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>Robofood webapp</title>
    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+   <link rel="stylesheet" href="/static/webapp.css">
 </head>
-<style>
-    .flex-container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    .flex-container > h3 {
-        flex-basis: 100%;
-    }
-    .flex-container > div {
-        flex-basis: 45%;
-        box-shadow: 0 0 0 1px black;
-        width: 45%;
-        margin: 5px;
-        margin-bottom: 5px;
-        text-align: center;
-        line-height: 100px;
-        border-radius: 5px;
-    }
-    .elements {
-        display: None;
-        align-items: center;
-        justify-content: center;
-    }
-    .button {
-        height: 1.5em;
-    }
-    img {
-        width: 100%;
-        height: auto;
-    }
-    .container-text {
-        line-height: 1.5em;
-        height: 3em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        width: 100%;
-    }
-</style>
 <body>
-
-   <div class="flex-container" id="wrapper">
+  <div id="main">
+    <div class="nav-bar fixed-top">
         {% for category in categories %}
-            {% if category.restaurant_id == ns.rest_id %}
-                <h3>{{ category.name }}</h3>
+            {% if category.restaurant_id == rest.id %}
+                <div id="nav-category-{{category.id}}" class="nav-items"><a href="#category-{{category.id}}" class="scrollNav-links" id="link-category-{{category.id}}">{{ category.name }}</a></div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <div class="rest-card">
+        <div class="rest-name">{{ rest.name }}</div>
+        <div class="rest-info">Время доставки: {{info.delivery_time}}<br>Адрес самовывоза: {{info.takeaway_address}}</div>
+    </div>
+    <div class="flex-container rest_{{rest.id}}" id="wrapper">
+       <div id="divTerms" class="item terms">
+           <img src="{{ info.img if info.img else '/static/dummy_rest.jpg' }}">
+           <div class="dish-name"><b>Условия доставки</b></div>
+       </div>
+        {% for category in categories %}
+            {% if category.restaurant_id == rest.id %}
+                <div class="category-name scrollNav-content" id="category-{{category.id}}">{{ category.name }}</div>
                 {% for dish in dishes %}
-                    {% if dish.id_rest == ns.rest_id and dish.category == category.name %}
-                        <div>
-                            <div class="container-img"><img src="{{dish.img_link}}"></div>
-                            <p>{{ dish.name }}</p>
-                            <div class="container-text">{{ dish.composition }}</div>
-                            <button type="button" class="btn btn-light" id="btn-{{dish.id}}">{{ dish.cost }} ₽</button>
+                    {% if dish.id_rest == rest.id and dish.category == category.name and dish.status %}
+                        <div class="item category-id-{{category.id}}" id="itemCard-{{dish.id}}">
+                            <img src="{{dish.img_link}}" id="img-item-{{dish.id}}">
+                            <div class="dish-name">{{ dish.name }}</div>
+                            <div class="container-text"><p class="dish-compose"><small class="dish-compose-text">{{ dish.composition }}</small></p></div>
+                            <div class="dish-cost" id="btn-{{dish.id}}">{{ dish.cost }} ₽</div>
                             <div class="elements" id="item-btn-{{dish.id}}">
-                                <div class="btn plusminus" id="btn-rem-{{dish.id}}">-</div>
-                                <div class="btn" id="amount-btn-{{dish.id}}">0</div>
-                                <div class="btn plusminus" id="btn-add-{{dish.id}}">+</div>
+                                <div class="plusminus" id="btn-rem-{{dish.id}}">-</div>
+                                <div class="quantity" id="amount-btn-{{dish.id}}">0</div>
+                                <div class="plusminus" id="btn-add-{{dish.id}}">+</div>
                             </div>
                         </div>
                     {% endif %}
                 {% endfor %}
-                <br/>
             {% endif %}
         {% endfor %}
    </div>
+    <div id="hiddenMainDishId" style="display:none;">{{dish_id}}</div>
+  </div>
+  <div id="cart" style="display:none;">
+    <div id="hiddenUid" style="display:none;"></div>
+    <div id="hiddenRestId" style="display:none;">{{rest_id}}</div>
+    <div id="hiddenDishId" style="display:none;">{{dish_id}}</div>
+  </div>
+  <div id="final" style="display:none;">
+    <div id="hiddenFinalUid" style="display:none;"></div>
+    <div id="hiddenFinalRestId" style="display:none;">{{rest_id}}</div>
+    <div id="hiddenPaymentMethod" style="display:none;"></div>
+  </div>
+  <div id="restTerms" class="terms" style="display:none;">
+    <div class="inn">ИНН: {{terms.rest_inn}}</div>
+    <div class="ogrn">ОГРН: {{terms.rest_ogrn}}</div>
+    <div class="fullname">Наименование организации: {{terms.rest_fullname}}</div>
+    <div class="address">Адрес: {{terms.rest_address}}</div>
+    <div class="text">{{terms.terms}}</div>
+  </div>
+  <div id="dishItem" style="display: none;">
+    <div id="dishItemMain"></div>
+    <div id="hiddenDishItemCost" style="display: none;"></div>
+    <div id="hiddenDishItemRestId" style="display:none;"></div>
+    <div id="hiddenDishItemDishId" style="display:none;"></div>
+  </div>
+  <div class="footer" id="mainFooter">
+    <button class="main-button" id="mainButton" onclick="mainButtonFunc()">Корзина</button>
+  </div>
+  <div id="hiddenTotal" style="display:none;"></div>
+  <div id="hiddenCurrentDishId" style="display:none;"></div>
 </body>
-
 <script>
     let tg = window.Telegram.WebApp;
-    let cart = {};
+    tg.ready();
     tg.expand();
-    tg.MainButton.text = "Корзина";
-    tg.MainButton.textColor = "#FFFFFF";
-    tg.MainButton.color = "#0275D8";
-    tg.MainButton.show();
-    if (tg.BackButton.isVisible) {
-        tg.BackButton.hide();
-    }
-    const wrapper = document.getElementById('wrapper');
-    wrapper.addEventListener('click', (event) => {
-      const isButton = event.target.nodeName === 'BUTTON';
-      if (!isButton) {
-        return;
-      }
-      let btn = document.getElementById(event.target.id);
-      btn.style.display = 'none';
-      document.getElementById("amount-"+event.target.id).innerHTML = 1;
-      document.getElementById("item-"+event.target.id).style.display = "flex";
-      cart[event.target.id.split("-")[1]] = 1;
-    });
-    document.querySelectorAll('.plusminus').forEach(function(e) {
-        e.addEventListener('click', (event) => {
-            let amountField = document.getElementById('amount-btn-' + e.id.split('-')[2]);
-            let amount = parseInt(amountField.innerHTML);
-            if (e.id.split('-')[1] == 'add') {
-                amount += 1;
-                cart[e.id.split('-')[2]] += 1;
-            } else if (e.id.split('-')[1] == 'rem') {
-                amount -= 1;
-                cart[e.id.split('-')[2]] -= 1;
-                if (amount == 0) {
-                    document.getElementById("item-btn-" + e.id.split('-')[2]).style.display = "none";
-                    document.getElementById("btn-" + e.id.split('-')[2]).style.display = "inline-block";
+    tg.MainButton.hide();
+    tg.BackButton.hide();
+    let uid = tg.initDataUnsafe.user.id;
+    // let uid = 113737020;
+    document.getElementById("hiddenUid").innerHTML = uid;
+    let dishId = $("#hiddenMainDishId").text()
+    let amount = 0;
+    $(document).ready(function(){
+        let x = document.getElementsByClassName("scrollNav-active");
+        if(x.length > 0) { x[0].classList.remove("scrollNav-active"); }
+        $(".scrollNav-links").first().addClass("scrollNav-active");
+        let rest_id = $("#wrapper").attr("class").split(' ')[1]
+        $.ajax({
+            url: "/webapp/data",
+            data: {"uid": uid, "method": "onload", "rest_id": rest_id},
+            type: "POST",
+            success: function(data){
+                if (!($.isEmptyObject(data.cart))) {
+                    for (var key in data.cart) {
+                        amount += Number(data.cart[key]["price"]) * Number(data.cart[key]["quantity"]);
+                        $("#btn-" + key).hide();
+                        $("#item-btn-" + key).show();
+                        $("#amount-btn-" + key).html(data.cart[key]['quantity']);
+                        $("#item-btn-" + key).css("display", "flex");
+                        $("#itemCard-" + key).css("border-bottom", "thick double #0275D8");
+                    }
+                    $("#mainButton").html("Корзина " + amount + " ₽");
+                    $("#hiddenTotal").html(amount);
                 }
-            };
-            amountField.innerHTML = amount;
+            }
         });
     });
-    Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        let params = "uid=" + tg.initDataUnsafe.user.id;
-        for (let key in cart) {
-            params += "&" + key + "=" + cart[key];
-        }
-        window.location = "/webapp_cart?" + params;
+    $('img[id^="img-item-"]').click(function(){
+      let category = "category-" + $(this).parent().attr("class").split("-")[2];
+      let itemId = $(this).attr("id").split("-")[2];
+      $("#hiddenCurrentDishId").html(itemId);
+      fetch("/webapp_item?" + new URLSearchParams({uid: uid, item: itemId, category: category}))
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          var data = JSON.stringify(json);
+          let item = JSON.parse(data);
+          let cost = 0;
+          let quantity = 0;
+          let count = 0;
+          $("#main").hide();
+          $("#dishItem").css("display", "block");
+          let flexDiv = document.createElement('div');
+          flexDiv.id = "dish-id-" + item.dishId;
+          flexDiv.className = 'flex-dishItem-container';
+          let imgDiv = document.createElement('div');
+          imgDiv.className = 'img-container';
+          let divImg = document.createElement('img');
+          divImg.src = item.dishImg;
+          imgDiv.appendChild(divImg);
+          flexDiv.appendChild(imgDiv);
+          let textName = document.createElement('h3');
+          textName.innerHTML = item.dishName;
+          flexDiv.appendChild(textName);
+          let compositionText = document.createElement('div');
+          compositionText.style.cssText = 'font-family:"Helvetica";padding:10px;';
+          compositionText.className = 'conatainer-text';
+          compositionText.innerHTML = item.dishComposition;
+          flexDiv.appendChild(compositionText);
+          let itemFooter = document.createElement('div');
+          itemFooter.id = "item-btn-dish-id";
+          itemFooter.className = "dishItemFooter";
+          let divMinus = document.createElement('div');
+          divMinus.id = "btn-rem";
+          divMinus.className = "btn plusMinusItem";
+          divMinus.onclick = function() {
+            cost = Number($('#hiddenDishItemCost').text());
+            quantity = Number($('#amount-btn-dish-id').text());
+            count = quantity - 1;
+            if (count >= 1) {
+             $('#amount-btn-dish-id').html(count);
+             $("#mainButton").html("Добавить " + cost * count + " ₽");
+            }
+          };
+          divMinus.innerHTML = "-";
+          itemFooter.appendChild(divMinus);
+          let divQuantity =  document.createElement('div');
+          divQuantity.id = "amount-btn-dish-id";
+          divQuantity.className = "btn quantity";
+          divQuantity.innerHTML = 1;
+          itemFooter.appendChild(divQuantity);
+          let divPlus = document.createElement('div');
+          divPlus.id = "btn-add";
+          divPlus.className = "btn plusMinusItem";
+          divPlus.onclick = function() {
+            cost = Number($('#hiddenDishItemCost').text());
+            quantity = Number($('#amount-btn-dish-id').text());
+            count = quantity + 1;
+            if (count >= 1) {
+             $('#amount-btn-dish-id').html(count);
+             $("#mainButton").html("Добавить " + cost * count + " ₽");
+            }
+          };
+          divPlus.innerHTML = "+";
+          itemFooter.appendChild(divPlus);
+          document.getElementById("mainFooter").insertBefore(itemFooter, document.getElementById("mainButton"));
+          document.getElementById("mainFooter").style.display = "flex";
+          $("#mainButton").css("width", "50%");
+          $("#mainButton").css("flex-shrink", "0");
+          $("#mainButton").html("Добавить " + item.dishCost + " ₽");
+          document.getElementById("dishItemMain").appendChild(flexDiv);
+          document.getElementById("hiddenDishItemCost").innerHTML = item.dishCost;
+          document.getElementById("hiddenDishItemRestId").innerHTML = item.restId;
+          document.getElementById("hiddenDishItemDishId").innerHTML = item.dishId;
+      });
+      tg.BackButton.show();
     });
-</script>
+    $(".nav-items").on("click", function() {
+        $(".nav-items").children("a").css("background-color", "#F8F8F8");
+        $(".nav-items").children("a").css("border", "1px solid #F8F8F8");
+        $(".nav-items").children("a").css("color", "black");
+        $(this).children("a").css("background-color", "#0275D8");
+        $(this).children("a").css("border", "1px solid #0275D8");
+        $(this).children("a").css("color", "#F8F8F8");
+        let x = document.getElementsByClassName("scrollNav-active");
+        if(x.length > 0) { x[0].classList.remove("scrollNav-active"); }
+        $(this).children("a").addClass("scrollNav-active");
+        document.getElementById($(this).attr("id").slice(5)).scrollIntoView({behavior: "instant"});
+    });
+    $("#wrapper").ready(function() {
+      $('.dish-cost').click(function(event) {
+        $(this).hide();
+        let cost = $(this).text().split(' ')[0];
+        $("#item-" + $(this).attr("id")).show();
+        $("#item-" + $(this).attr("id")).css("display", "flex");
+        $.ajax({
+          url: '/webapp/data',
+          type: 'POST',
+          data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[1], "quantity": 1, "method": "create"},
+          success: function(data) {
+            $("#hiddenTotal").html(data.total);
+            $("#amount-btn-" + data.dish_id).html(data.quantity);
+            amount += Number(cost);
+            $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
+            document.getElementById("mainButton").innerHTML = "Корзина " + amount + " ₽";
+          },
+        });
+      });
+    });
+    $(".plusminus").on("click", function() {
+      let operation = $(this).attr("id").split("-")[1];
+      $.ajax({
+        url: '/webapp/data',
+        type: 'POST',
+        data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[2], "quantity": 1, "method": "update",
+        "operation": operation},
+        success: function(data) {
+          let cost = $("#btn-" + data.dish_id).text().split(' ')[0];
+          let text = "Корзина";
+          $("#amount-btn-"+ data.dish_id).html(data.quantity);
+          $("#hiddenTotal").html(data.total);
+          if (operation == 'add') {
+            amount += Number(cost)
+          } else {
+            amount -= Number(cost)
+          }
+          if (data.quantity == 0) {
+            $("#itemCard-" + data.dish_id).css("border-bottom", "no");
+            $("#item-btn-" + data.dish_id).hide();
+            $("#btn-" + data.dish_id).show();
+            $("#itemCard-" + data.dish_id).css("border-bottom", "");
+          } else {
+            $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
+          }
+          if ($("#hiddenTotal").html() != 0) {
+            document.getElementById("mainButton").innerHTML = "Корзина " + $("#hiddenTotal").html() + " ₽";
+          } else {
+            document.getElementById("mainButton").innerHTML = "Корзина";
+          }
+        },
+      });
+    });
+    let rest_id = $("#wrapper").attr("class").split(" ")[1].split("_")[1]
+    function mainButtonFunc(){
+      if (document.getElementById("mainButton").innerHTML.indexOf("Корзина") !== -1) {
+        fetch("/webapp_cart?" + new URLSearchParams({uid: uid, restId: rest_id}))
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          var data = JSON.stringify(json);
+          document.getElementById("main").style.display = "none";
+          document.getElementById("mainButton").innerHTML = "Оформить заказ";
+          document.getElementById("cart").style.display = "block";
+          let items = JSON.parse(data);
+          var cart = document.getElementById("cart");
+          let cartDishId = 0;
+          let quantity = 0;
+          let uid = $("#hiddenUid").text();
+          for (let key in items.items) {
+            let newDiv = document.createElement('div');
+            newDiv.id = 'dish-'+key;
+            newDiv.className = 'grid-container';
+
+            let div1 = document.createElement('div');
+            div1.className = 'item1';
+            let img1 = document.createElement('img');
+            img1.src = items.items[key].img_link
+            div1.appendChild(img1);
+            newDiv.appendChild(div1);
+
+            let div2 = document.createElement('div');
+            div2.className = 'item2';
+            let img2 = document.createElement('img');
+            img2.src = items.items[key].img_link
+            div2.appendChild(img2);
+            newDiv.appendChild(div2);
+
+            let div3 = document.createElement('div');
+            div3.className = 'item3';
+            let divKey1 = document.createElement('div');
+            divKey1.innerText = items.items[key].name;
+            div3.appendChild(divKey1);
+            newDiv.appendChild(div3);
+
+            let div4 = document.createElement('div');
+            div4.className = 'item4';
+            let divKey2 = document.createElement('div');
+            divKey2.innerHTML = items.items[key].name;
+            div4.appendChild(divKey2);
+            newDiv.appendChild(div4);
+
+            let div5 = document.createElement('div');
+            div5.className = 'item5';
+            let divKey3 = document.createElement('div');
+            divKey3.innerText = items.items[key].name;
+            div5.appendChild(divKey3);
+            newDiv.appendChild(div5);
+
+            let div6 = document.createElement('div');
+            div6.className = 'item6';
+            let divControl1 = document.createElement('div');
+            divControl1.id = 'btn-rem-'+key;
+            divControl1.className = 'btn plusminus cartPlusMinus';
+            divControl1.onclick = function() {
+              let opts = {"uid": uid, "dish_id": divControl1.id.split("-")[2], "quantity": "1", "method": "update", "operation": "rem"};
+              $.ajax({
+                url: '/webapp/data',
+                type: 'POST',
+                data: opts,
+                dataType: 'json',
+                success: function(data) {
+                  dishId = data.dish_id;
+                  quantity = data.quantity;
+                  if (data.quantity == 0) {
+                    $("#item-btn-" + key).hide();
+                    $("#btn-" + key).show();
+                    $("#dish-" + data.dish_id).remove();
+                    $("#itemCard-" + data.dish_id).css("border-bottom", "");
+                  }
+                  $("#amountCart-btn-" + data.dish_id).html(data.quantity);
+                  $("#hiddenTotal").html(Number($("#hiddenTotal").html()) - Number(data.cost));
+                  $("#total1-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                  $("#total2-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                },
+              });
+            };
+            divControl1.innerHTML = '-';
+            div6.appendChild(divControl1);
+            newDiv.appendChild(div6);
+
+            let div7 = document.createElement('div');
+            div7.className = 'item7';
+            let divControl2 = document.createElement('div');
+            divControl2.id = 'amountCart-btn-'+key;
+            divControl2.className = 'btn';
+            divControl2.innerHTML = items.items[key].quantity;
+            div7.appendChild(divControl2);
+            newDiv.appendChild(div7);
+
+            let div8 = document.createElement('div');
+            div8.className = 'item8';
+            let divControl3 = document.createElement('div');
+            divControl3.id = 'btn-add-'+key;
+            divControl3.className = 'btn plusminus cartPlusMinus';
+            divControl3.onclick = function() {
+              let opts = {"uid": uid, "dish_id": divControl1.id.split("-")[2], "quantity": "1", "method": "update", "operation": "add"};
+              $.ajax({
+                url: '/webapp/data',
+                type: 'POST',
+                data: opts,
+                dataType: 'json',
+                success: function(data) {
+                  dishId = data.dish_id;
+                  quantity = data.quantity;
+                  $("#amountCart-btn-" + data.dish_id).html(data.quantity);
+                  $("#hiddenTotal").html(Number($("#hiddenTotal").html()) + Number(data.cost));
+                  $("#total1-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                  $("#total2-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                },
+              });
+            };
+            divControl3.innerHTML = '+';
+            div8.appendChild(divControl3);
+            newDiv.appendChild(div8);
+
+            let div9 = document.createElement('div');
+            div9.className = 'item9';
+            div9.id = 'total1-' + key;
+            let cost1 = document.createElement('p');
+            cost1.innerHTML = Number(items.items[key].quantity) * Number(items.items[key].cost);
+            div9.appendChild(cost1);
+            newDiv.appendChild(div9);
+
+            let div10 = document.createElement('div');
+            div10.className = 'item10';
+            div10.id = 'total2-' + key;
+            let cost2 = document.createElement('p');
+            cost2.innerHTML = Number(items.items[key].quantity) * Number(items.items[key].cost);
+            div10.appendChild(cost2);
+            newDiv.appendChild(div10);
+
+            cart.appendChild(newDiv);
+          }
+        });
+        tg.BackButton.show();
+      } else if (document.getElementById("mainButton").innerHTML === "Оформить заказ") {
+        document.getElementById("cart").style.display = "none";
+        document.getElementById("mainButton").innerHTML = "Продолжить";
+        document.getElementById("final").style.display = "block";
+        fetch("/webapp_confirm?" + new URLSearchParams({uid: uid}))
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          var data = JSON.stringify(json);
+          let items = JSON.parse(data);
+          var final = document.getElementById("final");
+          
+          let finalWrapDiv = document.createElement('div');
+          finalWrapDiv.id = "finalWrap";
+          let newP1 = document.createElement('p');
+          newP1.innerHTML = "Способ получения заказа";
+          finalWrapDiv.appendChild(newP1);
+
+          let div1 = document.createElement('div');
+          div1.id = "orderTypeGroup";
+          div1.className = 'btn-group-vertical';
+          div1.setAttribute("role", "group")
+          let button1Div1 = document.createElement('button');
+          button1Div1.id = "btn-delivery";
+          button1Div1.className = "btn";
+          button1Div1.onclick = function() {
+            $("#btn-takeaway").css("background-color", "white");
+            $("#btn-delivery").css("background-color", "#0275D8");
+            $("#input-address").show();
+          };
+          button1Div1.innerHTML = "Доставка";
+          div1.appendChild(button1Div1);
+          let button2Div1 = document.createElement('button');
+          button2Div1.id = "btn-takeaway";
+          button2Div1.className = "btn ";
+          button2Div1.onclick = function() {
+            $("#btn-delivery").css("background-color", "white");
+            $("#btn-takeaway").css("background-color", "#0275D8");
+            $("#input-address").hide();
+          };
+          button2Div1.innerHTML = "Самовывоз";
+          div1.appendChild(button2Div1);
+          finalWrapDiv.appendChild(div1);
+
+          let newP2 = document.createElement('p');
+          newP2.innerHTML = "Способ оплаты";
+          finalWrapDiv.appendChild(newP2);
+
+          let div2 = document.createElement('div');
+          div2.id = "paymentGroup";
+          div2.className = 'btn-group-vertical';
+          div2.setAttribute("role", "group")
+          let button1Div2 = document.createElement('button');
+          button1Div2.id = "btn-cash";
+          button1Div2.className = "btn";
+          button1Div2.onclick = function() {
+            $("#btn-card").css("background-color", "white");
+            $("#btn-cash").css("background-color", "#0275D8");
+            $("#hiddenPaymentMethod").html("cash");
+          };
+          button1Div2.innerHTML = "Наличные";
+          div2.appendChild(button1Div2);
+          let button2Div2 = document.createElement('button');
+          button2Div2.id = "btn-card";
+          button2Div2.className = "btn";
+          button2Div2.onclick = function() {
+            $("#btn-cash").css("background-color", "white");
+            $("#btn-card").css("background-color", "#0275D8");
+            $("#hiddenPaymentMethod").html("card");
+          };
+          button2Div2.innerHTML = "Картой";
+          div2.appendChild(button2Div2);
+          finalWrapDiv.appendChild(div2);
+
+          let newP3 = document.createElement('p');
+          newP3.innerHTML = "Информация";
+          finalWrapDiv.appendChild(newP3);
+
+          let div3 = document.createElement('div');
+          div3.className = 'input-group-vertical mb-3';
+          let input1 = document.createElement('input');
+          input1.id = "input-phone";
+          input1.type = "text";
+          input1.className = "form-control";
+          input1.ariaLabel = "Номер телефона";
+          input1.placeholder = "Номер телефона";
+          if (typeof items.phone !== "undefined") { input1.value = items.phone; }
+          div3.appendChild(input1);
+          let input2 = document.createElement('input');
+          input2.id = "input-address";
+          input2.type = "text";
+          input2.className = "form-control";
+          input2.ariaLabel = "Адрес доставки";
+          input2.placeholder = "Адрес доставки";
+          input2.value = items.address;
+          div3.appendChild(input2);
+          let input3 = document.createElement('input');
+          input3.id = "input-comment";
+          input3.type = "text";
+          input3.className = "form-control";
+          input3.ariaLabel = "Комментарий";
+          input3.placeholder = "Комментарий";
+          div3.appendChild(input3);
+          finalWrapDiv.appendChild(div3);
+
+          let newP4 = document.createElement('p');
+          newP4.innerHTML = "Итого";
+          finalWrapDiv.appendChild(newP4);
+
+          let div4 = document.createElement('div');
+          div4.className = 'summary';
+          let subDiv1 = document.createElement('div');
+          subDiv1.innerHTML = "Сумма";
+          div4.appendChild(subDiv1);
+          let subDiv2 = document.createElement('div');
+          subDiv2.id = "div-total";
+          subDiv2.innerHTML = items.total;
+          div4.appendChild(subDiv2);
+          finalWrapDiv.appendChild(div4);
+
+          final.appendChild(finalWrapDiv);
+        });
+      } else if (document.getElementById("mainButton").innerHTML === "Продолжить") {
+        let userPhone = $("#input-phone").val();
+        let userAddress = $("#input-address").val();
+        let orderType = "delivery";
+        let paymentMethod = $("#hiddenPaymentMethod").text();
+        if (window.getComputedStyle(document.getElementById("input-address")).display === "none") {
+          orderType = "takeaway";
+        }
+        if (!userPhone || !userAddress) {
+          // tempAlert(orderType);
+          if (orderType === "delivery") {
+            alert("Для оформления требуется указать номер телефона и адрес доставки");
+          } else {
+            alert("Для оформления требуется указать номер телефона");
+          }
+        } else {
+          let userTotal = $("#div-total").text();
+          $("#input-phone").on("input", function() {
+            userPhone = $(this).val();
+          });
+          $("#input-address").on("input", function() {
+            userAddress = $(this).val();
+          });
+          fetch("/webapp/data?" + new URLSearchParams({
+            uid: uid,
+            method: orderType,
+            payment: paymentMethod,
+            phone: userPhone,
+            address: userAddress,
+            total: userTotal
+          })).then(function(response) {
+            tg.close();
+          });
+          // tg.close();
+        }
+      } else if (document.getElementById("mainButton").innerHTML.indexOf("Добавить") !== -1) {
+        let subtotal = $("#hiddenTotal").html();
+        let dishId = $("#hiddenCurrentDishId").html();
+        fetch("/webapp/data", {
+          method: 'post',
+          headers: {
+            "Content-type": "application/x-www-form-urlencoded; charset=UTF-8"
+          },
+          body: 'uid=' + uid + '&dish_id=' + dishId + '&quantity=' + $('#amount-btn-dish-id').text() + '&method=add'
+        })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          var data = JSON.stringify(json);
+          let items = JSON.parse(data);
+          $("#hiddenTotal").html(items.total);
+          $("#mainFooter").css("display", "block");
+          $("#mainButton").show();
+          $("#mainButton").css("width", "95%");
+          $("#mainButton").css("flex-shrink", "");
+          $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
+          $("#item-btn-dish-id").remove();
+<!--          $("div[id^='dish-']").remove();-->
+          $("#dishItem").hide();
+          $(".flex-dishItem-container").remove();
+          $("#main").show();
+          tg.BackButton.hide();
+          $("#itemCard-" + items.dish_id).css("border-bottom", "thick double #0275D8");
+          $("#btn-" + items.dish_id).hide();
+          $("#item-btn-" + items.dish_id).show();
+          $("#item-btn-" + items.dish_id).css("display", "flex");
+          let quantity = $("#amount-btn-" + items.dish_id).text();
+          let subtotal = Number(quantity) + Number(items.quantity);
+          $("#amount-btn-" + items.dish_id).html(subtotal);
+          let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
+          let vh = window.innerHeight * 0.06;
+          window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
+        })
+        .catch(function (error) {
+          console.log('Request failed', error);
+        });
+      }
+    };
+    $('#divTerms')
+      .click(
+        function(){
+          tg.BackButton.show();
+          $("#mainButton").css('visibility', 'hidden');
+          $("#main").hide();
+          $("#restTerms").show();
+        }
+      );
+    Telegram.WebApp.onEvent('backButtonClicked', function(){
+      if (window.getComputedStyle(document.getElementById("cart")).display !== "none") {
+        tg.BackButton.hide();
+        dishId = $(".grid-container").first().attr("id").split("-")[1];
+        $(".grid-container").remove();
+        $("#main").show();
+        let subtotal = $("#hiddenTotal").html();
+        if (subtotal != 0) {
+          $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
+          let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
+          let vh = window.innerHeight * 0.06;
+          window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
+        } else {
+          $("#mainButton").html("Корзина");
+        }
+      } else if (window.getComputedStyle(document.getElementById("final")).display !== "none") {
+        tg.BackButton.show();
+        // something to do with finalWrap
+        $("#finalWrap").remove();
+        $("#cart").show();
+        $("#mainButton").html("Оформить заказ");
+      } else if (window.getComputedStyle(document.getElementById("restTerms")).display !== "none") {
+        tg.BackButton.hide();
+        $("#restTerms").hide();
+        $("#main").show();
+        $("#mainButton").css('visibility', 'visible');
+      } else if (window.getComputedStyle(document.getElementById("dishItem")).display !== "none") {
+        tg.BackButton.hide();
+        // something to do with dishItemsMain child node
+        $("#dishItemScriptSrc").remove();
+        dishId = $(".flex-dishItem-container").attr("id").split("-")[2];
+        $(".flex-dishItem-container").remove();
+        $("#dishItem").hide();
+        $("#item-btn-dish-id").remove();
+        $("#mainFooter").css("display", "block");
+        $("#mainButton").show();
+        $("#mainButton").css("width", "95%");
+        $("#mainButton").css("flex-shrink", "");
+        $("#main").show();
+        let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
+        let vh = window.innerHeight * 0.06;
+        window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
+        let subtotal = $("#hiddenTotal").html();
+        if (subtotal != 0) {
+          $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
+        } else {
+          $("#main").show();
+          $("#mainButton").html("Корзина");
+        }
+      }
+    });
+    function tempAlert(orderType) {
+     var el = document.createElement("div");
+     el.setAttribute("style","position:absolute;top:0%;width:100%;background-color:gray;color:red;");
+     if (orderType === "delivery") {
+      el.innerHTML = "Для оформления требуется указать номер телефона и адрес доставки";
+     } else {
+      el.innerHTML = "Для оформления требуется указать номер телефона";
+     }
+     setTimeout(function(){
+      el.parentNode.removeChild(el);
+     }, 1000);
+     document.body.appendChild(el);
+    }
+  </script>
 </html>

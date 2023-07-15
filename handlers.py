@@ -1,11 +1,13 @@
+import logging
 import re
 from datetime import datetime
 
 from sqlalchemy import func
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, KeyboardButton
+from telebot import formatting
+from telebot.types import InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB, WebAppInfo
 from app import db, send_email
 from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites, \
-    SpecialDish
+    SpecialDish, TextMenuMessage as Menu, RestaurantInfo, TextMenuMessage
 from models import OrderDetail as OD
 from settings import BOT, YKT, RULES, BASE_URL
 from utils import rest_menu_keyboard, write_history
@@ -13,25 +15,27 @@ from utils import rest_menu_keyboard, write_history
 
 def restaurant_callback(call):
     data = call.data.split('_')
-    rest_id = data[1]
+    logging.log(logging.INFO, f'rest_callback {data}')
+    rest_id = int(data[1])
     categories = Category.query.filter_by(restaurant_id=rest_id)
-    rest_name = Restaurant.query.filter_by(id=rest_id).first().name
+    rest = Restaurant.query.filter_by(id=rest_id).first()
+    webapp = WebAppInfo(BASE_URL + f"webapp/{rest_id}?uid={call.from_user.id}")
+    webapp_info = WebAppInfo(BASE_URL + f"webapp_info/{rest.id}")
 
     def categories_menu():
-        kbd = InlineKeyboardMarkup()
-        webApp = WebAppInfo(BASE_URL + "webapp")
-        kbd.add(InlineKeyboardButton(text="Компактный просмотр", web_app=webApp))
+        kbd = IKM()
+        kbd.add(IKB(text="Компактный просмотр", web_app=webapp))
         for category in categories.all():
-            kbd.add(InlineKeyboardButton(text=category.name, callback_data=f'rest_{rest_id}_cat_{category.id}'))
+            kbd.add(IKB(text=category.name, callback_data=f'rest_{rest_id}_cat_{category.id}'))
         cb_data = f'rest_{rest_id}_delivery_time_call_back'
-        kbd.add(InlineKeyboardButton(text='Узнать время доставки', callback_data=cb_data))
+        kbd.add(IKB(text='Узнать время доставки', callback_data=cb_data))
         cb_data = f'rest_{rest_id}_delivery_terms_show'
-        kbd.add(InlineKeyboardButton('Условия доставки', callback_data=cb_data))
-        text = f'Меню ресторана {rest_name}. В некоторых случаях доставка платная, районы и стоимость ' \
+        kbd.add(IKB('Условия доставки', callback_data=cb_data))
+        text = f'Меню ресторана {rest.name}. В некоторых случаях доставка платная, районы и стоимость ' \
                'смотрите в "Условия доставки " в списке меню Ресторана.'
         if 'from_promo' not in call.data:
             cb_data = 'back_to_rest_kb'
-            kbd.add(InlineKeyboardButton(text='Назад', callback_data=cb_data))
+            kbd.add(IKB(text='Назад', callback_data=cb_data))
         if 'menu' in call.data:
             BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=kbd)
         else:
@@ -46,35 +50,64 @@ def restaurant_callback(call):
         BOT.send_message(text=text, chat_id=call.from_user.id)
         category_id = int(data[3])
         category_name = categories.filter(Category.id == category_id).first().name
-        dishes = Dish.query.filter_by(id_rest=rest_id, category=category_name).all()
-        total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
-        total = total[0][0] if total[0][0] else 0
+        dishes = Dish.query.filter_by(id_rest=rest.id, category=category_name).all()
+        # total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+        # total = total[0][0] if total[0][0] else 0
         for dish in dishes:
-            keyboard = InlineKeyboardMarkup()
-            text = f'{rest_name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost}'
+            rest_info = RestaurantInfo.query.filter_by(rest_id=rest.id).first()
+            delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'
+            takeaway_address = rest_info.takeaway_address if rest_info else rest.address
+            keyboard = IKM()
+            text = f'{rest.name}\nДоставка - {delivery_time}\nСамовывоз - {takeaway_address}\n\n<b>{dish.name}</b>' \
+                   f'\n{dish.composition}\n{dish.cost} ₽\n<a href="{dish.img_link}">.</a>'
             dish_count = db.session.query(Cart.quantity).filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
             dish_count = dish_count[0] if dish_count else 0
-            cb_first = f'rest_{rest_id}_cat_{category_id}_dish_{dish.id}'
-            cb_last = f'{call.from_user.id}'
-            cb_fav = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
+            change_callback = f'rest_{rest_id}_cat_{category_id}_dish_{dish.id}'
+            fav_callback = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
             keyboard.row(
-                InlineKeyboardButton(text='⭐️', callback_data=cb_fav),
-                InlineKeyboardButton(text='-', callback_data=f'{cb_first}_rem_{cb_last}'),
-                InlineKeyboardButton(text=f'{dish_count} шт', callback_data='None'),
-                InlineKeyboardButton(text='+', callback_data=f'{cb_first}_add_{cb_last}')
+                IKB(text='⭐️', callback_data=fav_callback),
+                IKB(text='-', callback_data=f'{change_callback}_rem_{call.from_user.id}'),
+                IKB(text=f'{dish_count} шт', callback_data='None'),
+                IKB(text='+', callback_data=f'{change_callback}_add_{call.from_user.id}')
             )
-            keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'rest_{rest_id}_menu'))
-            keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
+            # keyboard.row(
+            #     IKB('Инфо', web_app=webapp_info),
+            #     IKB('В меню ресторана', callback_data=f'rest_{rest_id}_menu')
+            # )
+            # keyboard.add(IKB(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
             BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=keyboard, parse_mode='HTML')
-        return 'Ok'
+        return 'Ok', 200
 
     def dish_change():
-        keyboard = InlineKeyboardMarkup()
+        rest_id, cat_id, dish_id, method = int(data[1]), int(data[3]), int(data[5]), data[6]
         operation = {'add': 1, 'rem': -1}
-        dish = Dish.query.filter_by(id=int(data[5])).first()
+        dish = Dish.query.filter_by(id=dish_id).first()
         cart_item = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
         dish_count = cart_item.quantity if cart_item else 0
-        if data[6] == 'add' and dish_count == 0:
+        if method == 'add' and dish_count == 0:
+            if Cart.query.filter(Cart.user_uid == call.from_user.id, Cart.restaurant_id.notlike(rest.id)).all():
+                Cart.query.filter(
+                    Cart.user_uid == call.from_user.id, Cart.restaurant_id.notlike(rest.id)
+                ).delete(synchronize_session=False)
+                menu = Menu.query.filter(Menu.user_id == call.from_user.id, Menu.rest_id != rest.id).all()
+                for item in menu:
+                    cb_data = f'fav_{item.user_id}_{item.rest_id}_{item.dish_id}'
+                    change_callback = f'rest_{item.rest_id}_cat_{item.category_id}_dish_{item.dish_id}'
+                    keyboard = IKM(row_width=4)
+                    button1 = IKB(text='⭐', callback_data=cb_data)
+                    button2 = IKB(text='-', callback_data=f'{change_callback}_rem_{item.user_id}')
+                    button3 = IKB(text='0 шт.', callback_data='None')
+                    button4 = IKB(text='+', callback_data=f'{change_callback}_add_{item.user_id}')
+                    keyboard.add(button1, button2, button3, button4)
+                    try:
+                        BOT.edit_message_reply_markup(
+                            chat_id=item.user_id, message_id=item.message_id, reply_markup=keyboard
+                        )
+                    except Exception as e:
+                        print(e)
+
+                txt = "Вы добавили блюдо другого ресторана, корзина будет очищена"
+                BOT.answer_callback_query(callback_query_id=call.id, show_alert=False, text=txt)
             new_item = Cart(
                 name=dish.name, price=dish.cost, quantity=1, user_uid=call.from_user.id,
                 is_dish=1, is_water=0, dish_id=dish.id, restaurant_id=rest_id,
@@ -82,36 +115,36 @@ def restaurant_callback(call):
             )
             db.session.add(new_item)
             db.session.commit()
-        elif data[6] == 'add' or 'rem' and dish_count > 1:
-            cart_item.quantity += operation.get(data[6])
+        elif method == 'add' or 'rem' and dish_count > 1:
+            cart_item.quantity += operation.get(method)
             db.session.commit()
-        elif data[6] == 'rem' and dish_count == 0:
+        elif method == 'rem' and dish_count == 0:
             return 'Ok', 200
-        elif data[6] == 'rem' and dish_count == 1:
+        elif method == 'rem' and dish_count == 1:
             Cart.query.filter_by(id=cart_item.id).delete()
             db.session.commit()
         dish_count = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=dish.id).first()
         dish_count = dish_count.quantity if dish_count else 0
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         total = total[0][0] if total[0][0] else 0
-        text = f'{rest_name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost} р.'
-        cb_first = f'rest_{rest_id}_cat_{int(data[3])}_dish_{dish.id}'
-        cb_last = f'{call.from_user.id}'
-        cb_data = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
+        change_callback = f'rest_{rest_id}_cat_{cat_id}_dish_{dish.id}'
+        fav_callback = f'fav_{call.from_user.id}_{rest_id}_{dish.id}'
+        keyboard = IKM()
         keyboard.row(
-            InlineKeyboardButton(text='⭐️', callback_data=cb_data),
-            InlineKeyboardButton(text='-', callback_data=f'{cb_first}_rem_{cb_last}'),
-            InlineKeyboardButton(text=f'{dish_count} шт', callback_data='None'),
-            InlineKeyboardButton(text='+', callback_data=f'{cb_first}_add_{cb_last}')
+            IKB(text='⭐️', callback_data=fav_callback),
+            IKB(text='-', callback_data=f'{change_callback}_rem_{call.from_user.id}'),
+            IKB(text=f'{dish_count} шт', callback_data='None'),
+            IKB(text='+', callback_data=f'{change_callback}_add_{call.from_user.id}')
         )
-        keyboard.add(InlineKeyboardButton('Главное меню', callback_data=f'rest_{rest_id}_menu'))
-        keyboard.add(InlineKeyboardButton(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
-        BOT.edit_message_text(
+        if dish_count > 0:
+            webapp = WebAppInfo(BASE_URL + f"webapp/{rest_id}?dishId={dish.id}&uid={call.from_user.id}")
+            keyboard.row(IKB('Инфо', web_app=webapp_info))
+            keyboard.add(IKB(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
+            keyboard.add(IKB(f'Добавить другие блюда', web_app=webapp))
+        BOT.edit_message_reply_markup(
             chat_id=call.from_user.id,
-            text=text,
             message_id=call.message.id,
-            reply_markup=keyboard,
-            parse_mode='HTML'
+            reply_markup=keyboard
         )
 
     def show_terms():
@@ -126,56 +159,55 @@ def restaurant_callback(call):
 
     def show_delivery_time():
         user = User.query.filter_by(uid=call.from_user.id).first()
-        text = f'Укажите только адрес доставки для ресторана {rest_name}.'
+        text = f'Укажите только адрес доставки для ресторана {rest.name}.'
         keyboard = None
         if user.address:
-            keyboard = InlineKeyboardMarkup()
+            keyboard = IKM()
             text = f'Вы указали:\nАдрес доставки: {user.address}'
             cb_data1 = f'rest_{rest_id}_delivery_time_confirm_{call.from_user.id}_data'
             cb_data2 = f'rest_{rest_id}_delivery_t_i_m_e_change_{call.from_user.id}'
             cb_text = 'Отправить и узнать время доставки'
-            keyboard.add(InlineKeyboardButton(text=cb_text, callback_data=cb_data1))
-            keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data=cb_data2))
+            keyboard.add(IKB(text=cb_text, callback_data=cb_data1))
+            keyboard.add(IKB(text='Изменить данные', callback_data=cb_data2))
         BOT.send_message(text=text, chat_id=call.from_user.id, reply_markup=keyboard if keyboard else None)
         write_history(call.message.id, call.from_user.id, text, True)
 
     def delivery_time_confirm():
         user = User.query.filter_by(uid=call.from_user.id).first()
         service_uid = Restaurant.query.filter_by(id=rest_id).first().service_uid
-        text = f'Ваш запрос отправлен, ждем ответа ресторана {rest_name}'
+        text = f'Ваш запрос отправлен, ждем ответа ресторана {rest.name}'
         BOT.send_message(chat_id=user.uid, text=text)
         text = f'Клиент хочет узнать время доставки, укажите примерное время.\n' \
                f'Адрес доставки: {user.address}'
         cb_text = 'Можем доставить за '
         cb_text_no = 'Не можем доставить на этот адрес'
         cb_data = f'rest_{rest_id}_uid_{user.uid}_delivery_time_callback_time_count'
-        keyboard = InlineKeyboardMarkup()
+        keyboard = IKM()
         opts = {1: '30 минут', 2: '1 час', 3: '1 час и 30 минут', 4: '2 часа', 6: '3 часа'}
         for i in opts:
-            keyboard.add(InlineKeyboardButton(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
-        keyboard.add(InlineKeyboardButton(text=cb_text_no, callback_data=f'{cb_data}_no'))
+            keyboard.add(IKB(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
+        keyboard.add(IKB(text=cb_text_no, callback_data=f'{cb_data}_no'))
         BOT.send_message(chat_id=service_uid, text=text, reply_markup=keyboard)
         write_history(call.message.id, call.from_user.id, text, True)
 
     def delivery_time_change():
-        text = f'Укажите только адрес доставки для ресторана {rest_name}'
+        text = f'Укажите только адрес доставки для ресторана {rest.name}'
         msg = BOT.send_message(text=text, chat_id=call.from_user.id)
         BOT.register_next_step_handler(msg, delivery_time_change_address)
         write_history(call.message.id, call.from_user.id, text, True)
 
     def delivery_time_change_address(pair):
-        text = f'Ваш запрос отправлен, ждем ответа ресторана {rest_name}'
+        text = f'Ваш запрос отправлен, ждем ответа ресторана {rest.name}'
         BOT.send_message(chat_id=pair.chat.id, text=text)
         text = f'Клиент хочет узнать время доставки, укажите примерное время.\nАдрес доставки: {pair.text}'
-        rest = Restaurant.query.filter_by(name=rest_name).first()
         cb_text = 'Можем доставить за '
         cb_text_no = 'Не можем доставить на этот адрес'
         cb_data = f'rest_{rest.id}_uid_{pair.chat.id}_delivery_time_callback_time_count'
-        keyboard = InlineKeyboardMarkup()
+        keyboard = IKM()
         opts = {1: '30 минут', 2: '1 час', 3: '1 час и 30 минут', 4: '2 часа', 6: '3 часа'}
         for i in opts:
-            keyboard.add(InlineKeyboardButton(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
-        keyboard.add(InlineKeyboardButton(text=cb_text_no, callback_data=f'{cb_data}_no'))
+            keyboard.add(IKB(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
+        keyboard.add(IKB(text=cb_text_no, callback_data=f'{cb_data}_no'))
         BOT.send_message(chat_id=rest.service_uid, text=text, reply_markup=keyboard)
         client = User.query.filter_by(uid=pair.chat.id).first()
         client.address = pair.text
@@ -184,11 +216,11 @@ def restaurant_callback(call):
     def delivery_time_rest():
         service_uid = Restaurant.query.filter_by(id=rest_id).first().service_uid
         user = User.query.filter_by(uid=call.from_user.id).first()
-        text_user = f'К сожалению, ресторан {rest_name} не сможет осуществить доставку на указанный адрес'
+        text_user = f'К сожалению, ресторан {rest.name} не сможет осуществить доставку на указанный адрес'
         text_rest = 'Мы оповестили клиента о невозможности осуществления доставки на указанный адрес'
         if data[9] != 'no':
             time = int(data[9])
-            text_user = f'Ответ ресторана {rest_name}: примерное время доставки '
+            text_user = f'Ответ ресторана {rest.name}: примерное время доставки '
             answers = {30: f'{time} минут', 60: '1 час', 90: '1 час и 30 минут'}
             default = f'{time // 60} часа'
             time_text = answers.get(time, default)
@@ -212,7 +244,6 @@ def restaurant_callback(call):
 
 
 def cart_callback(call):
-    print('cart callback', call.data)
     data = call.data.split('_')
     cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
     rest = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
@@ -220,27 +251,28 @@ def cart_callback(call):
     def cart_confirm():
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         total = total[0][0] if total[0][0] else 0
-        keyboard = InlineKeyboardMarkup()
+        keyboard = IKM()
         text = 'Выберите вариант:'
-        first_button = InlineKeyboardButton(text='Доставка', callback_data='cart_confirm_delivery')
-        second_button = InlineKeyboardButton(text='Самовывоз', callback_data='cart_confirm_takeaway')
+        first_button = IKB(text='Доставка', callback_data='cart_confirm_delivery')
+        second_button = IKB(text='Самовывоз', callback_data='cart_confirm_takeaway')
         if rest.min_total or total < rest.min_total:
             text = f'Минимальная сумма заказа должна быть не менее {rest.min_total}'
-            first_button = InlineKeyboardButton(text='Меню', callback_data=f'rest_{rest.id}')
-            second_button = InlineKeyboardButton(text='Корзина', callback_data='cart')
+            first_button = IKB(text='Меню', callback_data=f'rest_{rest.id}')
+            second_button = IKB(text='Корзина', callback_data='cart')
         keyboard.add(first_button, second_button)
         BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
 
     def cart_confirm_options():
         user = User.query.filter_by(uid=call.from_user.id).first()
         option = call.data.split('_')[2]
+        print(option)
 
         def delivery():
             try:
-                text = f"Вы укалази:\nАдрес доставки: {user.address}\nКонтактный номер: {user.phone}"
-                keyboard = InlineKeyboardMarkup()
-                keyboard.add(InlineKeyboardButton(text='Отправить', callback_data='order_confirm'))
-                keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data='cart_confirm_change'))
+                text = f"Вы указали:\nАдрес доставки: {user.address}\nКонтактный номер: {user.phone}"
+                keyboard = IKM()
+                keyboard.add(IKB(text='Отправить', callback_data='order_confirm'))
+                keyboard.add(IKB(text='Изменить данные', callback_data='cart_confirm_change'))
                 BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
             except AttributeError:
                 text = 'Укажите адрес доставки. Улица, дом, кв, подъезд:'
@@ -250,7 +282,7 @@ def cart_callback(call):
 
         opts = {
             'change': 'Укажите адрес доставки. Улица, дом, кв, подъезд:',
-            'takeaway': 'Напишите во сколько хотите забрать Ваш заказ ( в цифрах без букв)'
+            'takeaway': 'Напишите во сколько хотите забрать Ваш заказ (в цифрах без букв)'
         }
 
         def cart_delivery_address(pair):
@@ -265,9 +297,9 @@ def cart_callback(call):
             usr.phone = pair.text
             db.session.commit()
             text = f'Вы указали:\nАдрес доставки: {usr.address}\nКонтактный номер: {usr.phone}'
-            keyboard = InlineKeyboardMarkup()
-            keyboard.add(InlineKeyboardButton(text='Отправить', callback_data='order_confirm'))
-            keyboard.add(InlineKeyboardButton(text='Изменить данные', callback_data='cart_confirm_change'))
+            keyboard = IKM()
+            keyboard.add(IKB(text='Отправить', callback_data='order_confirm'))
+            keyboard.add(IKB(text='Изменить данные', callback_data='cart_confirm_change'))
             BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=keyboard)
 
         def cart_takeaway(pair):
@@ -277,10 +309,10 @@ def cart_callback(call):
                 text = f'Вы указали:\nСамовывоз: {pair.text}\nКонтактный номер: {usr.phone}'
                 cb_time = f'order_confirm_change_time_takeaway_{pair.text}'
                 cb_phone = f'order_confirm_change_phone_takeaway_{pair.text}'
-                kbd = InlineKeyboardMarkup()
-                kbd.add(InlineKeyboardButton(text='Отправить', callback_data=f'order_id_confirm_takeaway_{pair.text}'))
-                kbd.add(InlineKeyboardButton(text='Изменить время', callback_data=cb_time))
-                kbd.add(InlineKeyboardButton(text='Изменить телефон', callback_data=cb_phone))
+                kbd = IKM()
+                kbd.add(IKB(text='Отправить', callback_data=f'order_id_confirm_takeaway_{pair.text}'))
+                kbd.add(IKB(text='Изменить время', callback_data=cb_time))
+                kbd.add(IKB(text='Изменить телефон', callback_data=cb_phone))
                 BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=kbd)
             else:
                 mesg = BOT.send_message(chat_id=pair.chat.id, text=text)
@@ -294,10 +326,10 @@ def cart_callback(call):
             cb_time = f'order_confirm_change_time_takeaway_{time}'
             cb_phone = f'order_confirm_change_phone_takeaway_{usr.phone}'
             db.session.commit()
-            kbd = InlineKeyboardMarkup()
-            kbd.add(InlineKeyboardButton(text='Отправить', callback_data=f'order_id_confirm_takeaway_{time}'))
-            kbd.add(InlineKeyboardButton(text='Изменить время', callback_data=cb_time))
-            kbd.add(InlineKeyboardButton(text='Изменить телефон', callback_data=cb_phone))
+            kbd = IKM()
+            kbd.add(IKB(text='Отправить', callback_data=f'order_id_confirm_takeaway_{time}'))
+            kbd.add(IKB(text='Изменить время', callback_data=cb_time))
+            kbd.add(IKB(text='Изменить телефон', callback_data=cb_phone))
             BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=kbd)
 
         if option in opts:
@@ -316,28 +348,28 @@ def cart_callback(call):
         cart_item = Cart.query.filter_by(id=item_id).first()
         cart_item = cart_item if cart_item else cart[0]
         item_id = cart_item.id
-        keyboard = InlineKeyboardMarkup()
+        keyboard = IKM()
         total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
         total = total[0][0] if total[0][0] else 0
         text = '<b>Корзина</b>\n'
-        row = [InlineKeyboardButton(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in
+        row = [IKB(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in
                enumerate(cart, start=1)]
-        row.insert(0, InlineKeyboardButton(text='❌', callback_data=f'cart_item_id_{item_id}_clear'))
+        row.insert(0, IKB(text='❌', callback_data=f'cart_item_id_{item_id}_clear'))
         dish = Dish.query.filter_by(id=cart_item.dish_id).first()
         text += f'<a href="{dish.img_link}">{rest.name}</a>\n{dish.name}\n{dish.composition}\n{dish.cost}'
         keyboard.row(*row)
         row = [
-            InlineKeyboardButton(text='-', callback_data=f'cart_item_id_{item_id}_remove'),
-            InlineKeyboardButton(text=f'{cart_item.quantity} шт', callback_data='None'),
-            InlineKeyboardButton(text='+', callback_data=f'cart_item_id_{item_id}_add')
+            IKB(text='-', callback_data=f'cart_item_id_{item_id}_remove'),
+            IKB(text=f'{cart_item.quantity} шт', callback_data='None'),
+            IKB(text='+', callback_data=f'cart_item_id_{item_id}_add')
         ]
         keyboard.row(*row)
         row = [
-            InlineKeyboardButton(text='Очистить', callback_data='purge'),
-            InlineKeyboardButton(text='Меню', callback_data=f'rest_{cart_item.restaurant_id}')
+            IKB(text='Очистить', callback_data='purge'),
+            IKB(text='Меню', web_app=WebAppInfo(BASE_URL + f"webapp/{rest.id}?uid={call.from_user.id}"))
         ]
         keyboard.row(*row)
-        keyboard.add(InlineKeyboardButton(text=f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
+        keyboard.add(IKB(text=f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
         BOT.edit_message_text(
             chat_id=call.from_user.id,
             text=text,
@@ -373,7 +405,6 @@ def cart_callback(call):
 
 
 def order_callback(call):
-    print('order callback', call.data)
     data = call.data.split('_')
 
     def order_confirm():
@@ -394,10 +425,9 @@ def order_callback(call):
             order_state="Заказ отправлен, ожидание ответа ресторана."
         )
         db.session.add(new_order)
-        txt = f'Заказ отправлен, ждите ответа ресторана {rstrnt.name}.' \
+        txt = f'Заказ отправлен, ждите ответа ресторана {rstrnt.name}.\n' \
               'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
         BOT.send_message(chat_id=call.from_user.id, text=txt)
-        write_history(call.message.id, call.from_user.id, txt, True)
         user = User.query.filter_by(uid=new_order.uid).first()
         txt = f'Поступил заказ № {new_order.id}\nСостав заказа:\n'
         for item in cart:
@@ -413,17 +443,18 @@ def order_callback(call):
         txt += f'Общая сумма заказа: {summ} р.\n'
         bt_label = "Принять и доставить "
         cb_data = f'order_{new_order.id}_change'
-        txt += f'Адрес доставки {user.address}\nПерейдите в чат-бот, чтобы обработать заказ https://t.me/robofood1bot'
-        kbd = InlineKeyboardMarkup()
+        txt += f'Адрес доставки: {user.address}\n'
+        tlg_link = 'Перейдите в чат-бот, чтобы обработать заказ https://t.me/robofood1bot'
+        kbd = IKM()
         d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
         for item in d:
-            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}'))
-        kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
-        kbd.add(InlineKeyboardButton(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
+            kbd.add(IKB(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}_send'))
+        kbd.add(IKB(text='Не принят', callback_data='None')),
+        kbd.add(IKB(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
         Cart.query.filter_by(user_uid=call.from_user.id).delete()
         db.session.commit()
         del cart
-        send_email(rstrnt.email, f'Поступил заказ из Robofood № {new_order.id}', txt)
+        send_email(rstrnt.email, f'Поступил заказ из Robofood № {new_order.id}', txt + tlg_link)
         return rstrnt.service_uid, txt, kbd
 
     def order_confirm_change_actions():
@@ -446,23 +477,23 @@ def order_callback(call):
         usr.phone = pair.text
         db.session.commit()
         txt = f'Вы указали:\nАдрес доставки: {usr.address}\nКонтактный номер: {usr.phone}'
-        kbd = InlineKeyboardMarkup()
-        kbd.add(InlineKeyboardButton(text='Отправить', callback_data='order_confirm'))
-        kbd.add(InlineKeyboardButton(text='Изменить данные', callback_data='cart_confirm_change'))
+        kbd = IKM()
+        kbd.add(IKB(text='Отправить', callback_data='order_confirm'))
+        kbd.add(IKB(text='Изменить данные', callback_data='cart_confirm_change'))
         BOT.send_message(chat_id=pair.chat.id, text=txt, reply_markup=kbd)
 
     def order_triple_actions():
         order = Order.query.filter_by(id=int(data[1])).first()
         rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
         details = OD.query.filter_by(order_id=order.id).all()
-        user_id, txt, kbd = None, None, InlineKeyboardMarkup()
+        user_id, txt, kbd = None, None, IKM()
         if data[2] == 'change':
             txt = f'Что хотите изменить в заказе № {order.id}?'
             for item in details:
                 cb_txt = f'{item.order_dish_name}, {item.order_dish_quantity} шт.'
-                kbd.row(InlineKeyboardButton(text=cb_txt, callback_data='None'),
-                    InlineKeyboardButton(text='❌', callback_data=f'order_{order.id}_del_{item.id}'))
-            kbd.add(InlineKeyboardButton(text='Назад', callback_data=f'order_{order.id}_menu'))
+                kbd.row(IKB(text=cb_txt, callback_data='None'),
+                        IKB(text='❌', callback_data=f'order_{order.id}_del_{item.id}'))
+            kbd.add(IKB(text='Назад', callback_data=f'order_{order.id}_menu'))
             BOT.edit_message_text(text=txt, chat_id=rest.service_uid, message_id=call.message.id, reply_markup=kbd)
             txt, kbd = None, None
         elif data[2] == 'delivered':
@@ -478,19 +509,24 @@ def order_callback(call):
             bt_text = "Принять и доставить "
             opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
             for i in opts:
-                kbd.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
-            kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
-            kbd.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
+                kbd.add(IKB(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
+            kbd.add(IKB(text='Не принят', callback_data='None')),
+            kbd.add(IKB(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
             user_id = rest.service_uid
         elif data[2] == 'send2user':
+            total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(
+                order_id=order.id).all()
+            total = total[0][0] if total[0][0] else 0
+            order.order_total = total
+            db.session.commit()
             BOT.send_message(text='Отправлен измененный заказ', chat_id=rest.service_uid)
             txt = f'<b>В связи с отсутствием одного из блюд, ресторан {rest.name} изменил Ваш заказ</b>\n'
             txt += 'Состав Вашего заказа:\n'
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
             txt += f'На общую сумму - {order.order_total} р.'
-            kbd.add(InlineKeyboardButton(text='Оформить заказ', callback_data=f'order_{order.id}_user_confirm'))
-            kbd.add(InlineKeyboardButton(text='Изменить заказ', callback_data=f'order_{order.id}_user_change'))
-            kbd.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'order_{order.id}_user_cancel'))
+            kbd.add(IKB(text='Оформить заказ', callback_data=f'order_{order.id}_user_confirm'))
+            kbd.add(IKB(text='Изменить заказ', callback_data=f'order_{order.id}_user_change'))
+            kbd.add(IKB(text='Отменить заказ', callback_data=f'order_{order.id}_user_cancel'))
             user_id = order.uid
         return user_id, txt, kbd
 
@@ -510,20 +546,20 @@ def order_callback(call):
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
             txt += f'Общая сумма заказа: {order.order_total} р.\n'
             txt += f'Адрес доставки: {db.session.query(User.address).filter_by(uid=user_id).first()[0]}'
-            kbd = InlineKeyboardMarkup()
+            kbd = IKM()
             bt_text = "Принять и доставить "
             opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
             for i in opts:
-                kbd.add(InlineKeyboardButton(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}'))
-            kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
-            kbd.add(InlineKeyboardButton(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
+                kbd.add(IKB(bt_text + opts[i], callback_data=f'order_{order.id}_accept_{30 * i}_send'))
+            kbd.add(IKB(text='Не принят', callback_data='None')),
+            kbd.add(IKB(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
             user_id = rest.service_uid
             db.session.commit()
         elif data[3] == 'cancel':
             txt = f'Ваш заказ № {order.id} отменен'
             BOT.send_message(chat_id=call.from_user.id, text=txt)
             txt = f'Клиент отменил заказ № {order.id}'
-            order.order_state = 'Отменен'
+            order.order_state = 'Заказ отменен'
             user_id = rest.service_uid
             db.session.commit()
         elif data[3] == 'change':
@@ -543,25 +579,25 @@ def order_callback(call):
             db.session.commit()
             cart = Cart.query.filter_by(user_uid=order.uid).all()
             txt = f'Клиент решил изменить заказ № {order.id}. Номер заказа будет изменен.'
-            BOT.send_message(chat_id=call.from_user.id, text=txt)
-            kbd = InlineKeyboardMarkup()
-            row = [InlineKeyboardButton(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in
+            BOT.send_message(chat_id=rest.service_uid, text=txt)
+            kbd = IKM()
+            row = [IKB(text=f'{i}', callback_data=f'cart_item_id_{item.id}') for i, item in
                    enumerate(cart, start=1)]
-            row.insert(0, InlineKeyboardButton(text='❌', callback_data=f'cart_item_id_{cart[0].id}_clear'))
+            row.insert(0, IKB(text='❌', callback_data=f'cart_item_id_{cart[0].id}_clear'))
             kbd.row(*row)
             row = [
-                InlineKeyboardButton(text='-', callback_data=f'cart_id_{cart[0].id}_remove'),
-                InlineKeyboardButton(text=f'{cart[0].quantity} шт', callback_data='None'),
-                InlineKeyboardButton(text='+', callback_data=f'cart_id_{cart[0].id}_add')
+                IKB(text='-', callback_data=f'cart_id_{cart[0].id}_remove'),
+                IKB(text=f'{cart[0].quantity} шт', callback_data='None'),
+                IKB(text='+', callback_data=f'cart_id_{cart[0].id}_add')
             ]
             kbd.row(*row)
             row = [
-                InlineKeyboardButton(text='Очистить', callback_data=f'cart_purge'),
-                InlineKeyboardButton(text='Меню', callback_data=f'rest_{cart[0].restaurant_id}')
+                IKB(text='Очистить', callback_data=f'cart_purge'),
+                IKB(text='Меню', callback_data=f'rest_{cart[0].restaurant_id}')
             ]
             kbd.row(*row)
             cb_text = f'Оформить заказ на сумму {order.order_total}'
-            kbd.add(InlineKeyboardButton(text=cb_text, callback_data='cart_confirm'))
+            kbd.add(IKB(text=cb_text, callback_data='cart_confirm'))
             dish = Dish.query.filter_by(id=cart[0].dish_id).first()
             txt = f'<b>Корзина</b>\n<a href="{dish.img_link}">{rest}</a>\n{dish.composition}\n{cart[0].price}'
             user_id = order.uid
@@ -571,31 +607,31 @@ def order_callback(call):
             total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(
                 order_id=order.id).all()
             total = total[0][0] if total[0][0] else 0
-            order.total = total
+            order.order_total = total
             db.session.commit()
             details = OD.query.filter_by(order_id=order.id).all()
             if not details:
-                markup = rest_menu_keyboard()
+                markup = rest_menu_keyboard(order.uid)
                 txt = f'Ресторан {rest.name} отменил заказ. Пожалуйста, выберите ресторан:'
                 if not markup.keyboard:
                     txt = f'Ресторан {rest.name} отменил заказ. В данное время нет работающих ресторанов'
                     markup = None
-                BOT.send_message(chat_id=user_id, text=txt, reply_markup=markup)
+                BOT.send_message(chat_id=order.uid, text=txt, reply_markup=markup)
                 order.order_state = 'Заказ отменен'
                 db.session.commit()
                 txt = 'Заказ отменен, клиенту направлено соответствующее сообщение'
                 user_id = rest.service_uid
             else:
                 txt = f'Что хотите изменить в заказе № {order.id}?'
-                kbd = InlineKeyboardMarkup()
+                kbd = IKM()
                 for item in details:
                     cb_txt = f'{item.order_dish_name}, {item.order_dish_quantity} шт.'
                     kbd.row(
-                        InlineKeyboardButton(text=cb_txt, callback_data='None'),
-                        InlineKeyboardButton(text='❌', callback_data=f'order_{order.id}_del_{item.id}')
+                        IKB(text=cb_txt, callback_data='None'),
+                        IKB(text='❌', callback_data=f'order_{order.id}_del_{item.id}')
                     )
-                kbd.add(InlineKeyboardButton(text='Отправить клиенту', callback_data=f'order_{order.id}_send2user'))
-                kbd.add(InlineKeyboardButton(text='Назад', callback_data=f'order_{order.id}_menu'))
+                kbd.add(IKB(text='Отправить клиенту', callback_data=f'order_{order.id}_send2user'))
+                kbd.add(IKB(text='Назад', callback_data=f'order_{order.id}_menu'))
                 BOT.edit_message_text(text=txt, chat_id=rest.service_uid, message_id=call.message.id, reply_markup=kbd)
                 txt, kbd = None, None
         return user_id, txt, kbd
@@ -609,15 +645,15 @@ def order_callback(call):
             order_id=order.id).all()
         total = total[0][0] if total[0][0] else 0
         if data[2] == 'confirm':
-            kbd = InlineKeyboardMarkup()
+            kbd = IKM()
             user_id = rest.service_uid
             txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
             txt += f'Общая сумма заказа: {total} р.\nСамовывоз, время {data[4]}'
-            kbd.add(InlineKeyboardButton(text='Принять', callback_data=f'order_{order.id}_accept_0_{data[4]}'))
-            kbd.add(InlineKeyboardButton(text='Отменить', callback_data=f'order_{order.id}_change'))
+            kbd.add(IKB(text='Принять', callback_data=f'order_{order.id}_accept_0_{data[4]}'))
+            kbd.add(IKB(text='Отменить', callback_data=f'order_{order.id}_change'))
         elif data[2] == 'accept':
-            time = int(data[4])
+            time = int(data[3])
             pattern = r'(.[0-2][0-9]:[0-5][0-9](.*)[0-2][0-9]:[0-5][0-9])|' \
                       r'(.[а-яА-Я][a-яА-Я]-[а-яА-Я][a-яА-Я].[0-2][0-9]:[0-5][0-9](.*)[0-2][0-9]:[0-5][0-9])'
             rest_name = re.sub(pattern, '', rest.name)
@@ -627,19 +663,23 @@ def order_callback(call):
             user_id = rest.service_uid
             if time != 0:
                 txt = f'Ресторан {rest_name} принял ваш заказ № {order.id} и доставит в течении '
-                BOT.send_message(chat_id=user_id, text=txt + time_txt)
-                kbd = InlineKeyboardMarkup()
+                BOT.send_message(chat_id=order.uid, text=txt + time_txt)
+                kbd = IKM()
                 cb_text = 'Принять и доставить '
                 cb_data = f'order_{order.id}_accept'
                 opts = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
                 for i in opts:
-                    kbd.add(InlineKeyboardButton(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
+                    kbd.add(IKB(cb_text + opts[i], callback_data=f'{cb_data}_{30 * i}'))
                 cb_data = f'order_{order.id}_change'
-                kbd.add(InlineKeyboardButton(text=f'Принят на доставку в течении {time_txt}', callback_data='None'))
-                kbd.add(InlineKeyboardButton(text=f'Изменить заказ № {order.id}', callback_data=cb_data))
+                kbd.add(IKB(text=f'Принят на доставку в течении {time_txt}', callback_data='None'))
+                kbd.add(IKB(text=f'Изменить заказ № {order.id}', callback_data=cb_data))
+            else:
+                txt = f'Ресторан {rest_name} принял ваш заказ № {order.id}\n'
+                txt += f'Самовывоз с адреса: {rest.address}'
+                BOT.send_message(chat_id=order.uid, text=txt)
             state = 'самовывоз' if time == 0 else 'доставка'
             order.order_state = 'Заказ принят рестораном, ' + state
-            order.order_state += txt[53:] if time != 0 else ''
+            order.order_state += txt[53:] + time_txt if time != 0 else ''
             client = User.query.filter_by(uid=order.uid).first()
             txt = f'Поступил заказ № {order.id}\nСостав заказа:\n'
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
@@ -647,7 +687,7 @@ def order_callback(call):
             txt += f'Адрес доставки: {client.address}' if time != 0 else f'Самовывоз, {time_txt}'
             BOT.edit_message_text(text=txt, chat_id=user_id, message_id=call.message.id, reply_markup=kbd)
             txt = f'Мы оповестили клиента, что Вы приняли заказ № {order.id}'
-            txt += f', доставка {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз, {time_txt}'
+            txt += f', доставка в течении {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз\n'
             txt += f'Контактный номер: {client.phone}'
             kbd = None
             db.session.commit()
@@ -664,62 +704,61 @@ def order_callback(call):
 
 
 def favorites_callback(call):
-    print('favorites callback', call.data)
     data, txt = call.data.split('_'), ''
     rest_id, dish_id = int(data[3]) if data[2] == 'rest' else int(data[2]), int(data[3])
     favs = Favorites.query.filter_by(uid=int(data[1]), rest_id=rest_id).all()
     if data[2] != 'rest':
         txt = 'Блюдо удалено из избранного'
-        Favorites.query.filter_by(uid=call.from_user.id, dish_id=dish_id, rest_id=rest_id).delete()
-        if not favs:
+        if Favorites.query.filter_by(uid=int(data[1]), dish_id=dish_id).first():
+            Favorites.query.filter_by(uid=call.from_user.id, dish_id=dish_id).delete()
+        else:
             db.session.add(Favorites(uid=call.from_user.id, dish_id=dish_id, rest_id=rest_id))
             txt = 'Блюдо добавлено в избранное'
         db.session.commit()
         BOT.answer_callback_query(callback_query_id=call.id, show_alert=False, text=txt)
     else:
-        kbd = InlineKeyboardMarkup()
         for item in favs:
+            kbd = IKM()
             dish = Dish.query.filter_by(id=item.dish_id).first()
             rest = Restaurant.query.filter_by(id=item.rest_id).first()
             txt = f'{rest.name}\n<a href="{dish.img_link}">.</a>\n<b>{dish.name}</b>\n{dish.composition}\n{dish.cost} р.'
             cart = Cart.query.filter_by(user_uid=call.from_user.id, dish_id=item.dish_id, restaurant_id=rest_id).first()
             quantity = cart.quantity if cart else 0
             category_id = Category.query.filter_by(name=dish.category).first().id
-            cb_data = f'fav_{call.from_user.id}_{rest_id}_{item.dish_id}'
-            cb_data_first = f'rest_{rest_id}_cat_{category_id}_dish_{item.dish_id}'
-            cb_data_last = f'{call.from_user.id}_{call.message.id}'
+            fav_callback = f'fav_{call.from_user.id}_{rest_id}_{item.dish_id}'
+            change_callback = f'rest_{rest_id}_cat_{category_id}_dish_{item.dish_id}'
             kbd.row(
-                InlineKeyboardButton(text='⭐️', callback_data=cb_data),
-                InlineKeyboardButton(text='-', callback_data=f'{cb_data_first}_rem_{cb_data_last}'),
-                InlineKeyboardButton(text=f'{quantity} шт', callback_data='None'),
-                InlineKeyboardButton(text='+', callback_data=f'{cb_data_first}_add_{cb_data_last}')
+                IKB(text='⭐️', callback_data=fav_callback),
+                IKB(text='-', callback_data=f'{change_callback}_rem_{call.from_user.id}'),
+                IKB(text=f'{quantity} шт', callback_data='None'),
+                IKB(text='+', callback_data=f'{change_callback}_add_{call.from_user.id}')
             )
-            kbd.add(InlineKeyboardButton(text='Меню ресторана', callback_data=f'rest_{rest_id}'))
-            total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
-            total = total[0][0] if total[0][0] else 0
-            kbd.add(InlineKeyboardButton(text=f'В корзину: заказ на сумму {total} р', callback_data='cart_confirm'))
+            # kbd.row(
+            #     IKB('Инфо', web_app=WebAppInfo(BASE_URL + f"webapp_info/{rest.id}")),
+            #     IKB('В меню ресторана', callback_data=f'rest_{rest_id}_menu')
+            # )
+            # total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+            # total = total[0][0] if total[0][0] else 0
+            # kbd.add(IKB(text=f'В корзину: заказ на сумму {total} р', callback_data='cart_confirm'))
             BOT.send_message(chat_id=call.from_user.id, text=txt, parse_mode='HTML', reply_markup=kbd)
 
 
 def other_callback(call):
-    print('other callback')
-    print(call.data)
-
     def back_to_rest(data):
         text = 'Пожалуйста, выберите ресторан:'
         BOT.edit_message_text(
             chat_id=data.from_user.id,
             message_id=data.message.message_id,
             text=text,
-            reply_markup=rest_menu_keyboard()
+            reply_markup=rest_menu_keyboard(data.from_user.id)
         )
 
     def back_to_rest_promo(data):
-        keyboard = InlineKeyboardMarkup()
+        keyboard = IKM()
         promo_dish = PromoDish.query.first()
         text = f'<a href="{promo_dish.img_link}">.</a>'
         cb_data = f'rest_{promo_dish.rest_id}_from_promo'
-        keyboard.add(InlineKeyboardButton(text='Меню ресторана', callback_data=cb_data))
+        keyboard.add(IKB(text='Меню ресторана', callback_data=cb_data))
         BOT.edit_message_text(
             chat_id=data.from_user.id,
             message_id=data.message.message_id,
@@ -738,29 +777,41 @@ def other_callback(call):
         callback = data.data.split('_')
         uid, text, kbd = data.from_user.id, None, None
         if callback[0] == 'subcat':
-            kbd = InlineKeyboardMarkup()
             subcat_id = int(callback[2])
             query = db.session.query(
                 Restaurant.id, Restaurant.name, Dish.name, Dish.composition, Dish.cost, Dish.img_link, Dish.id,
-                SpecialDish.category_id).filter(SpecialDish.subcat_id == subcat_id,
+                SpecialDish.category_id, Restaurant.address).filter(SpecialDish.subcat_id == subcat_id,
                                                 SpecialDish.rest_id == Restaurant.id,
                                                 SpecialDish.dish_id == Dish.id).all()
             for item in query:
-                text = f'<b>{item[1]}</b>\n{item[2]}\n{item[3]}\n{item[4]}\n<a href="{item[5]}">.</a>\n'
-                cart = Cart.query.filter_by(user_uid=uid, dish_id=item.dish_id, restaurant_id=item[0]).first()
+                rest_info = RestaurantInfo.query.filter_by(rest_id=item[0]).first()
+                delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'
+                takeaway_address = rest_info.takeaway_address if rest_info else item[8]
+                kbd = IKM()
+                text = f'<b>{item[1]}</b>\nДоставка - {delivery_time}\nСамовывоз - {takeaway_address}\n\n'
+                text += f'{item[2]}\n{item[3]}\n{item[4]} р.\n<a href="{item[5]}">.</a>\n'
+                cart = Cart.query.filter_by(user_uid=uid, dish_id=item[6]).first()
                 quantity = cart.quantity if cart else 0
-                cb_data = f'fav_{uid}_{item[0]}_{item[6]}'
-                cb_data_first = f'rest_{item[0]}_cat_{item[7]}_dish_{item[6]}'
-                cb_data_last = f'{uid}_{data.message.id}'
+                fav_callback = f'fav_{uid}_{item[0]}_{item[6]}'
+                change_callback = f'rest_{item[0]}_cat_{item[7]}_dish_{item[6]}'
                 kbd.row(
-                    InlineKeyboardButton(text='⭐️', callback_data=cb_data),
-                    InlineKeyboardButton(text='-', callback_data=f'{cb_data_first}_rem_{cb_data_last}'),
-                    InlineKeyboardButton(text=f'{quantity} шт', callback_data='None'),
-                    InlineKeyboardButton(text='+', callback_data=f'{cb_data_first}_add_{cb_data_last}')
+                    IKB(text='⭐️', callback_data=fav_callback),
+                    IKB(text='-', callback_data=f'{change_callback}_rem_{uid}'),
+                    IKB(text=f'{quantity} шт', callback_data='None'),
+                    IKB(text='+', callback_data=f'{change_callback}_add_{uid}')
                 )
-                total = db.session.query(func.sum(Cart.price*Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
-                total = total[0][0] if total[0][0] else 0
-                kbd.add(InlineKeyboardButton(text=f'В корзину: заказ на сумму {total} р', callback_data='cart'))# BOT.send_message(chat_id=uid, text=text, parse_mode='HTML', reply_markup=kbd)
+                # total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(
+                #     user_uid=call.from_user.id).all()
+                # total = total[0][0] if total[0][0] else 0
+                # kbd.add(IKB(text=f'В корзину: заказ на сумму {total} р', callback_data='cart'))
+                msg = BOT.send_message(chat_id=uid, text=text, parse_mode='HTML' if kbd else None, reply_markup=kbd)
+                txt_menu = TextMenuMessage(
+                    user_id=uid, message_id=msg.id, rest_id=item[0], text=text, img=item[5],
+                    category_id=item[7], dish_id=item[6], quantity=quantity
+                )
+                db.session.add(txt_menu)
+                db.session.commit()
+            return 'Ok', 200
         elif callback[0] == 'user':
             order = Order.query.filter_by(uid=uid).order_by(Order.id.desc()).first()
             text = 'У Вас пока нет оформленных заказов.'

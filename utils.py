@@ -1,11 +1,26 @@
+import logging
+import sys
+from logging.handlers import RotatingFileHandler
 import re
 
 from telebot import types
+from telebot.types import WebAppInfo
 
 from app import db
 from models import User, History, Restaurant, Order
 from datetime import datetime
-from settings import YKT, MONTHS
+from settings import YKT, MONTHS, BASE_URL
+
+
+def setup_logger():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s",
+        handlers=[
+            logging.FileHandler("restobot.log"),
+            logging.StreamHandler(stream=sys.stdout)
+        ]
+    )
 
 
 def check_user(msg):
@@ -34,7 +49,7 @@ def write_history(msg_id, chat_id, text, is_bot):
     db.session.commit()
 
 
-def rest_menu_keyboard():
+def rest_menu_keyboard(uid):
     """Возвращает меню с наименованиями ресторанов"""
 
     def is_time_between(begin_time, ending_time, check_time=None):
@@ -52,6 +67,7 @@ def rest_menu_keyboard():
     for restaurant in restaurants:
         if not restaurant.enabled:
             continue
+        webapp = WebAppInfo(BASE_URL + f"webapp/{restaurant.id}?uid={uid}")
         if match := re.search(pattern, restaurant.name, re.IGNORECASE):
             if ' ' not in match.group(1):
                 start_time = datetime.strptime(match.group(1).split('-')[0], '%H:%M').time()
@@ -62,10 +78,10 @@ def rest_menu_keyboard():
 
             if is_time_between(start_time, end_time, current_time):
                 keyboard.add(
-                    types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'rest_{restaurant.id}'))
+                    types.InlineKeyboardButton(text=f'{restaurant.name}', web_app=webapp))
         else:
             keyboard.add(
-                types.InlineKeyboardButton(text=f'{restaurant.name}', callback_data=f'rest_{restaurant.id}'))
+                types.InlineKeyboardButton(text=f'{restaurant.name}', web_app=webapp))
     return keyboard
 
 
@@ -82,7 +98,8 @@ def stat1():
         current_month_rests_total = {}
         for data in stat_data:
             order_date = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
-            if order_date == month and ('Подтверждена' or 'Заказ принят рестораном' in data.order_state) \
+            if order_date == month and ('Подтверждена' in data.order_state or 'Заказ принят рестораном' in
+                                        data.order_state) \
                     and Restaurant.query.filter_by(id=data.order_rest_id).first():
                 current_month_total += data.order_total
                 rest_name = Restaurant.query.filter_by(id=data.order_rest_id).first().name
@@ -107,7 +124,7 @@ def stat2():
     rests_data, text = [], ''
     rest = Restaurant.query
     for data in stat_data:
-        if ('Подтверждена' or 'Заказ принят рестораном' in data.order_state) and rest.filter_by(
+        if ('Подтверждена' in data.order_state or 'Заказ принят рестораном' in data.order_state) and rest.filter_by(
                 id=data.order_rest_id).first():
             rest_name = rest.filter_by(id=data.order_rest_id).first().name
             day = str(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
@@ -133,7 +150,7 @@ def stat3():
     days = []
     for data in order_data:
         day = int(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
-        if 'Подтверждена' or 'Заказ принят рестораном' in data.order_state:
+        if 'Подтверждена' in data.order_state or 'Заказ принят рестораном' in data.order_state:
             if day in days:
                 stat.update({day: stat[day] + 1})
             else:
@@ -147,7 +164,7 @@ def stat3():
 
 
 def stat4():
-    orders = Order.query.filter_by(order_state="Отменен").all()
+    orders = Order.query.filter((Order.order_state == "Отменен") | (Order.order_state == "Заказ отменен")).all()
     text = f'Всего отмененных заказов: {len(orders)}\n'
     for order in orders:
         text += Restaurant.query.filter_by(id=order.order_rest_id).first().name

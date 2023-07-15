@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block script %}
 <script>
-    $( document ).ready(function() {
+    $(document).ready(function() {
         $("#btnAddCombo").click(function(){
             $("#comboAddForm").toggle();
         });
@@ -47,6 +47,9 @@
             $("#btnRestDisable" + {{ restaurant.id }}).click(function(){
                 $("#restDisable" + {{ restaurant.id }}).toggle();
             });
+            $("#btnRestInfo" + {{ restaurant.id }}).click(function(){
+                $("#restInfo" + {{ restaurant.id }}).toggle();
+            });
         {% endfor %}
 
         {% for dish in dishes %}
@@ -67,6 +70,20 @@
                 }
             });
         {% endfor %}
+        $(".dish-status").click(function(){
+            console.log($(this).attr("id"));
+            let dish_id = $(this).attr("id").slice(13);
+            method = $(this).text();
+            $.ajax({
+                url: "/admin/data",
+                data: {"dish_id": dish_id, "method": method},
+                type: "POST",
+                success: function(){
+                    let name = {"Выключить": "Включить", "Включить": "Выключить"};
+                    $("#btnDishStatus" + dish_id).html(name[$("#btnDishStatus" + dish_id).text()]);
+                }
+            });
+        });
     });
 </script>
 {% endblock %}
@@ -667,6 +684,7 @@
                                                         <th scope="col">Изображение</th>
                                                         <th scope="col"></th>
                                                         <th scope="col"></th>
+                                                        <th scope="col"></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -679,6 +697,7 @@
                                                                 <td style="vertical-align: middle;" class="dishEdit">{{ dish.category }}</td>
                                                                 <td style="vertical-align: middle;" class="dishEdit"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
                                                                 <td style="vertical-align: middle;" class="dishEdit"><button id="btnDishEdit{{ dish.id }}" type="button" class="btn btn-warning">Изменить</button></td>
+                                                                <td style="vertical-align: middle;" class="dishEdit"><button id="btnDishStatus{{ dish.id }}" type="button" class="btn btn-info dish-status">{% if dish.status == True %}Выключить{% else %}Включить{% endif %}</button></td>
                                                                 <td style="vertical-align: middle;" class="dishEdit">
                                                                     <form method="post">
                                                                         {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
@@ -757,6 +776,28 @@
                                         </tr>
                                     </table>
                                 </form>
+                                <button id="btnRestInfo{{ restaurant.id }}" type="button">Информация клиенту</button>
+                                <form id="restInfo{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
+                                    <table class="table">
+                                        {{ restaurant_info_form.csrf_token(id="restaurant" + restaurant.id|string + "_info_form_csrf") }}
+                                        {{ restaurant_info_form.rest_id(value=restaurant.id, style="display:none;") }}
+                                        <tr>
+                                            <td>{{ restaurant_info_form.rest_img.label }}</td>
+                                            <td>{{ restaurant_info_form.rest_img }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_info_form.delivery_time.label }}</td>
+                                            <td>{{ restaurant_info_form.delivery_time }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_info_form.takeaway_address.label }}</td>
+                                            <td>{{ restaurant_info_form.takeaway_address }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{{ restaurant_info_form.rest_info_submit(class="btn btn-success", id="restaurant" + restaurant.id|string + "_info_submit_field") }}</td>
+                                        </tr>
+                                    </table>
+                                </form>
                                 <button id="btnRestDisable{{ restaurant.id }}" type="button">Статус</button>
                                 <form id="restDisable{{ restaurant.id }}" style="display:none;white-space:pre;" method="POST" enctype="multipart/form-data">
                                     <table class="table">
@@ -830,6 +871,7 @@
                                                                         <th scope="col">Изображение</th>
                                                                         <th scope="col"></th>
                                                                         <th scope="col"></th>
+                                                                        <th scope="col"></th>
                                                                     </tr>
                                                                 </thead>
                                                             {% for dish in dishes %}
@@ -842,6 +884,7 @@
                                                                             <td style="vertical-align: middle;">{{ dish.category }}</td>
                                                                             <td style="vertical-align: middle;"><img src="{{ dish.img_link }}" height=100 width=100 align="center"></td>
                                                                             <td style="vertical-align: middle;" class="dishEditRest"><button id="btnDishEditRest{{ dish.id }}" type="button" class="btn btn-warning">Изменить</button></td>
+                                                                            <td style="vertical-align: middle;" class="dishStatusRest"><button id="btnDishStatusRest{{ dish.id }}" type="button" class="btn btn-info">Статус</button></td>
                                                                             <td style="vertical-align: middle;">
                                                                                 <form method="post">
                                                                                     {{ dish_delete_form.csrf_token(id="dish" + dish.id|string + "_delete_form_csrf") }}
@@ -1054,7 +1097,6 @@
                 <div class="card-body">
                     <form action="" method="post">
                         {{ category_form.csrf_token(id="category_add_form_csrf") }}
-
                         <table class="table">
                             {% if ns.rest_id != 0 %}
                                 <tr>

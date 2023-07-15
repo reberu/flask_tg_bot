@@ -153,6 +153,14 @@ class RestaurantDeleteForm(FlaskForm):
     rest_delete_submit = SubmitField("Удалить")
 
 
+class RestaurantInfoForm(FlaskForm):
+    rest_id = HiddenField("Hidden restaurant id field")
+    rest_img = FileField("Загрузите изображение")
+    delivery_time = StringField("Время доставки")
+    takeaway_address = StringField("Адрес самовывоза")
+    rest_info_submit = SubmitField("Применить")
+
+
 class CategoryDeleteForm(FlaskForm):
     choices = [''] + [choice.name for choice in db.session.query(Category).all()]
     name = SelectField("Название категории", choices=choices)
