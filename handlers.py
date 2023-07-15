@@ -265,6 +265,7 @@ def cart_callback(call):
     def cart_confirm_options():
         user = User.query.filter_by(uid=call.from_user.id).first()
         option = call.data.split('_')[2]
+        print(option)
 
         def delivery():
             try:
@@ -513,6 +514,11 @@ def order_callback(call):
             kbd.add(IKB(f'Изменить заказ № {order.id}', callback_data=f'order_{order.id}_change'))
             user_id = rest.service_uid
         elif data[2] == 'send2user':
+            total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(
+                order_id=order.id).all()
+            total = total[0][0] if total[0][0] else 0
+            order.order_total = total
+            db.session.commit()
             BOT.send_message(text='Отправлен измененный заказ', chat_id=rest.service_uid)
             txt = f'<b>В связи с отсутствием одного из блюд, ресторан {rest.name} изменил Ваш заказ</b>\n'
             txt += 'Состав Вашего заказа:\n'
@@ -553,7 +559,7 @@ def order_callback(call):
             txt = f'Ваш заказ № {order.id} отменен'
             BOT.send_message(chat_id=call.from_user.id, text=txt)
             txt = f'Клиент отменил заказ № {order.id}'
-            order.order_state = 'Отменен'
+            order.order_state = 'Заказ отменен'
             user_id = rest.service_uid
             db.session.commit()
         elif data[3] == 'change':
@@ -601,7 +607,7 @@ def order_callback(call):
             total = db.session.query(func.sum(OD.order_dish_cost * OD.order_dish_quantity)).filter_by(
                 order_id=order.id).all()
             total = total[0][0] if total[0][0] else 0
-            order.total = total
+            order.order_total = total
             db.session.commit()
             details = OD.query.filter_by(order_id=order.id).all()
             if not details:
@@ -667,6 +673,10 @@ def order_callback(call):
                 cb_data = f'order_{order.id}_change'
                 kbd.add(IKB(text=f'Принят на доставку в течении {time_txt}', callback_data='None'))
                 kbd.add(IKB(text=f'Изменить заказ № {order.id}', callback_data=cb_data))
+            else:
+                txt = f'Ресторан {rest_name} принял ваш заказ № {order.id}\n'
+                txt += f'Самовывоз с адреса: {rest.address}'
+                BOT.send_message(chat_id=order.uid, text=txt)
             state = 'самовывоз' if time == 0 else 'доставка'
             order.order_state = 'Заказ принят рестораном, ' + state
             order.order_state += txt[53:] + time_txt if time != 0 else ''
@@ -677,7 +687,7 @@ def order_callback(call):
             txt += f'Адрес доставки: {client.address}' if time != 0 else f'Самовывоз, {time_txt}'
             BOT.edit_message_text(text=txt, chat_id=user_id, message_id=call.message.id, reply_markup=kbd)
             txt = f'Мы оповестили клиента, что Вы приняли заказ № {order.id}'
-            txt += f', доставка в течении {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз, {time_txt}'
+            txt += f', доставка в течении {time_txt} на адрес: {client.address}\n' if time != 0 else f'\nСамовывоз\n'
             txt += f'Контактный номер: {client.phone}'
             kbd = None
             db.session.commit()

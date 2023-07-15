@@ -86,39 +86,40 @@
     {% endif %}
     <div id="hiddenRestId" style="display:none;">{{rest_id}}</div>
     <div id="hiddenDishId" style="display:none;">{{dish_id}}</div>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        tg.MainButton.text = "Оформить заказ";
+        tg.MainButton.textColor = "#FFFFFF";
+        tg.MainButton.color = "#0275D8";
+        tg.MainButton.show();
+        tg.BackButton.show();
+        let uid = tg.initDataUnsafe.user.id;
+    <!--    let uid = 113737020;-->
+        let restId = $('#hiddenRestId').text();
+        let dishId = $('#hiddenDishId').text()
+        $(".plusminus").on("click", function() {
+            let operation = $(this).attr("id").split("-")[1];
+            $.ajax({
+                url: '/webapp/data',
+                type: 'POST',
+                data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[2], "quantity": 1, "method": "update",
+                "operation": operation},
+                success: function(data) {
+                    $("#amount-btn-" + data.dish_id).html(data.quantity);
+                    if (data.quantity == 0) {
+                        $("#dish-" + data.dish_id).hide();
+                    }
+                },
+            });
+        });
+        Telegram.WebApp.onEvent('mainButtonClicked', function(){
+            window.open("/webapp_confirm?uid=" + uid), "_self";
+        });
+        Telegram.WebApp.onEvent('backButtonClicked', function(){
+            window.open("/webapp/" + restId + "?dishId=" + dishId, "_self");
+        });
+    </script>
 </body>
 </html>
-<script>
-    let tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.MainButton.text = "Оформить заказ";
-    tg.MainButton.textColor = "#FFFFFF";
-    tg.MainButton.color = "#0275D8";
-    tg.MainButton.show();
-    tg.BackButton.show();
-    let uid = tg.initDataUnsafe.user.id;
-<!--    let uid = 113737020;-->
-    let restId = $('#hiddenRestId').text();
-    let dishId = $('#hiddenDishId').text()
-    $(".plusminus").on("click", function() {
-        let operation = $(this).attr("id").split("-")[1];
-        $.ajax({
-            url: '/webapp/data',
-            type: 'POST',
-            data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[2], "quantity": 1, "method": "update",
-            "operation": operation},
-            success: function(data) {
-                $("#amount-btn-" + data.dish_id).html(data.quantity);
-                if (data.quantity == 0) {
-                    $("#dish-" + data.dish_id).hide();
-                }
-            },
-        });
-    });
-    Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        window.location = "/webapp_confirm?uid=" + uid;
-    });
-    Telegram.WebApp.onEvent('backButtonClicked', function(){
-        window.location = "/webapp/" + restId + "?dishId=" + dishId;
-    });
-</script>

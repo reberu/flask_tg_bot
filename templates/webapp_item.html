@@ -26,6 +26,7 @@
    </footer>
    <script>
    let tg = window.Telegram.WebApp;
+   tg.ready();
    let cost = Number($('#hiddenCost').text());
    let restId = Number($('#hiddenId').text());
    let dishId = $('#hiddenDishId').text();

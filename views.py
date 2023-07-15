@@ -371,6 +371,7 @@ def webapp_main(Number):
         print("Exception of int(request.args.get('uid')) is:", e)
         uid = None
     rest = Restaurant.query.filter_by(id=Number).first()
+    terms = RestaurantDeliveryTerms.query.filter_by(rest_id=Number).first()
     if Cart.query.filter(Cart.user_uid == uid, Cart.restaurant_id.notlike(rest.id)).all():
         Cart.query.filter(
             Cart.user_uid == uid, Cart.restaurant_id.notlike(rest.id)
@@ -384,7 +385,9 @@ def webapp_main(Number):
         dish_id = request.args.get('dishId', type=str)
     except Exception as e:
         print(e)
-    return render_template('webapp.html', dishes=dishes, categories=categories, rest=rest, info=info, dish_id=dish_id)
+    return render_template(
+        'webapp.html', dishes=dishes, categories=categories, rest=rest, info=info, dish_id=dish_id, terms=terms
+    )
 
 
 @app.route('/webapp_rest/<int:Number>', methods=['GET'])
@@ -407,7 +410,8 @@ def webapp_cart():
                                'quantity': item.quantity, 'cost': item.price}
     if items:
         dish_id = list(items.keys())[-1]
-    return render_template('webapp_cart.html', uid=uid, items=items, rest_id=rest_id, dish_id=dish_id)
+    # return render_template('webapp_cart.html', uid=uid, items=items, rest_id=rest_id, dish_id=dish_id)
+    return {"uid": uid, "items": items, "rest_id": rest_id, "dish_id": dish_id}
 
 
 @app.route('/webapp_confirm', methods=['GET'])
@@ -417,7 +421,8 @@ def webapp_confirm():
     total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=uid).all()[0][0]
     total = total if total else 0
     try:
-        return render_template('webapp_confirm.html', phone=user.phone, address=user.address, total=total)
+        return {"phone": user.phone, "address": user.address, "total": total}
+        # return render_template('webapp_confirm.html', phone=user.phone, address=user.address, total=total)
     except AttributeError:
         return abort(404)
 
@@ -428,16 +433,31 @@ def webapp_item():
     dish_id = request.args.get('item', type=int)
     category = request.args.get('category', type=str)
     dish = Dish.query.filter_by(id=dish_id).first()
-    return render_template('webapp_item.html', uid=uid, dish=dish, category=category)
+    # return render_template('webapp_item.html', uid=uid, dish=dish, category=category)
+    return {"uid": uid, "category": category, "dishId": dish_id, "dishName": dish.name, "dishImg": dish.img_link,
+            "dishComposition": dish.composition, "dishCost": dish.cost, "restId": dish.id_rest}
+
+
+@app.route('/webapp/router', methods=['POST'])
+def webapp_router():
+    uid = int(request.form['uid'])
+    rest_id = int(request.form['restId'])
+    route = request.form['route']
+    return redirect(url_for('webapp_cart', uid=uid, rest_id=rest_id, **request.args))
 
 
 @app.route('/webapp/data', methods=['POST', 'GET'])
 def webapp_data():
     if request.method == 'POST':
-        uid = int(request.form['uid']) if request.form['uid'] else None
-        method = request.form['method']
-        dish_id = quantity = cart = None
+        uid, dish_id, quantity, cart = None, None, None, None
+        if request.json:
+            uid = int(request.json['uid'])
+            method = request.json['method']
+        else:
+            uid = int(request.form['uid']) if request.form['uid'] else None
+            method = request.form['method']
         jCart = {}
+        quantity = None
 
         def create():
             nonlocal dish_id, quantity
@@ -453,21 +473,30 @@ def webapp_data():
                 db.session.add(cart)
 
         def update():
-            nonlocal dish_id, quantity
-            dish_id = int(request.form['dish_id'])
+            nonlocal dish_id, quantity, cart
+            if request.json:
+                dish_id = int(request.json['dish_id'])
+                operation = request.json['operation']
+            else:
+                dish_id = int(request.form['dish_id'])
+                operation = request.form['operation']
             cart = Cart.query.filter_by(user_uid=uid, dish_id=dish_id).first()
-            operation = request.form['operation']
-            operations = {'add': 1, 'rem': -1}
-            cart.quantity += operations[operation]
-            quantity = cart.quantity
-            if quantity == 0:
-                Cart.query.filter_by(user_uid=uid, dish_id=dish_id).delete()
-            db.session.commit()
+            if cart:
+                operations = {'add': 1, 'rem': -1}
+                cart.quantity += operations[operation]
+                quantity = cart.quantity
+                if quantity == 0:
+                    Cart.query.filter_by(user_uid=uid, dish_id=dish_id).delete()
+                db.session.commit()
 
         def add():
             nonlocal dish_id, quantity
-            dish_id = int(request.form['dish_id'])
-            quantity = int(request.form['quantity'])
+            if request.json:
+                dish_id = int(request.json['dish_id'])
+                quantity = int(request.json['quantity'])
+            else:
+                dish_id = int(request.form['dish_id'])
+                quantity = int(request.form['quantity'])
             cart_item = Cart.query.filter_by(user_uid=uid, dish_id=dish_id).first()
             if cart_item:
                 cart_item.quantity += quantity
@@ -476,7 +505,7 @@ def webapp_data():
                 service_uid = Restaurant.query.filter_by(id=dish.id_rest).first()
                 service_uid = service_uid.service_uid if service_uid else None
                 db.session.add(Cart(name=dish.name, price=dish.cost, quantity=quantity, user_uid=uid, is_dish=1,
-                            is_water=0, dish_id=dish_id, restaurant_id=dish.id_rest, service_uid=service_uid))
+                                    is_water=0, dish_id=dish_id, restaurant_id=dish.id_rest, service_uid=service_uid))
 
         def onload():
             rest_id = request.form['rest_id']
@@ -495,7 +524,10 @@ def webapp_data():
         post_methods = {'create': create, 'update': update, 'onload': onload, 'add': add}
         post_methods.get(method)()
         db.session.commit()
-        return {"uid": uid, "dish_id": dish_id, "quantity": quantity, "cart": jCart}
+        total = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=uid).all()[0][0]
+        total = total if total else 0
+        cost = 0 if not dish_id else Dish.query.filter_by(id=dish_id).first().cost
+        return {"uid": uid, "dish_id": dish_id, "quantity": quantity, "cart": jCart, "cost": cost, "total": total}
     else:
         uid = request.args.get('uid')
         method = request.args.get('method')
@@ -507,8 +539,12 @@ def webapp_data():
         rest_id = Cart.query.filter_by(user_uid=uid).first().restaurant_id
         rest = Restaurant.query.filter_by(id=rest_id).first()
         text = 'Вы указали:\n'
-        text += f'Адрес доставки: {address}\n' if method == 'delivery' else 'Самовывоз\n'
+        if method == 'delivery':
+            text += f'Адрес доставки: {address}\n'
+        else:
+            text += f'Самовывоз\nАдрес ресторана: {rest.address}\n'
         text += f'Контактный номер: {phone}\nСумма заказа: {total}\n'
+        text += 'Оплата наличными\n' if payment == "cash" else "Оплата картой\n"
         text += f'Заказ отправлен, ждите ответа ресторана {rest.name}. ' \
                 'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
         BOT.send_message(chat_id=uid, text=text)
@@ -540,13 +576,21 @@ def webapp_data():
             ))
             text += f'{item.name} - {item.quantity} шт.\n'
         text += f'Общая сумма заказа: {total} р.\n'
-        bt_label = "Принять и доставить "
+        text += 'Оплата наличными\n' if payment == "cash" else "Оплата картой\n"
         cb_data = f'order_{new_order.id}_change'
-        text += f'Адрес доставки {user.address}\n'
         kbd = InlineKeyboardMarkup()
-        d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
-        for item in d:
-            kbd.add(InlineKeyboardButton(bt_label + d[item], callback_data=f'order_{new_order.id}_accept_{30 * item}_send'))
+        if method == 'delivery':
+            bt_label = "Принять и доставить "
+            text += f'Адрес доставки {user.address}'
+            d = {1: 'за 30 минут', 2: 'за 1 час', 3: 'за 1 час и 30 минут', 4: 'за 2 часа', 6: 'за 3 часа'}
+            for item in d:
+                kbd.add(InlineKeyboardButton(bt_label + d[item],
+                                             callback_data=f'order_{new_order.id}_accept_{30 * item}_send'))
+        else:
+            bt_label = "Принять на самовывоз"
+            kbd.add(InlineKeyboardButton(bt_label, callback_data=f'order_{new_order.id}_accept_0_send'))
+            text += "Самовывоз"
+
         kbd.add(InlineKeyboardButton(text='Не принят', callback_data='None')),
         kbd.add(InlineKeyboardButton(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
         Cart.query.filter_by(user_uid=uid).delete()

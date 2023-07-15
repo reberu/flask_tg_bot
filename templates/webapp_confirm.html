@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<html>
 <head>
    <meta charset="UTF-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -68,14 +69,15 @@
 </html>
 <script>
     let tg = window.Telegram.WebApp;
+    tg.ready();
     tg.expand();
     tg.MainButton.text = "Продолжить";
     tg.MainButton.textColor = "#FFFFFF";
     tg.MainButton.color = "#0275D8";
     tg.MainButton.show();
     tg.BackButton.hide();
-    method = "delivery";
-    payment = "cash";
+    let method = "delivery";
+    let payment = "cash";
     $(".btn").click(function(e) {
       if ($(this).attr("id") == "btn-takeaway") {
          $("#btn-delivery").css("background-color", "white");
@@ -106,7 +108,12 @@
     });
     params =  "&method=" + method + "&payment=" + payment + "&phone=" + phone + "&address=" + address + "&total=" + total;
     Telegram.WebApp.onEvent('mainButtonClicked', function(){
-        window.location = "/webapp/data?uid=" + tg.initDataUnsafe.user.id + params;
-        tg.close();
+      setTimeout(() => {
+        console.log("Delayed for 1 second.");
+      }, 1000);
+      window.open("/webapp/data?uid=" + tg.initDataUnsafe.user.id + params, "_self");
+      setTimeout(() => {
+         tg.close();
+      }, 1000);
     });
 </script>

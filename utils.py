@@ -98,7 +98,8 @@ def stat1():
         current_month_rests_total = {}
         for data in stat_data:
             order_date = int(datetime.fromtimestamp(data.order_datetime).strftime("%m"))
-            if order_date == month and ('Подтверждена' or 'Заказ принят рестораном' in data.order_state) \
+            if order_date == month and ('Подтверждена' in data.order_state or 'Заказ принят рестораном' in
+                                        data.order_state) \
                     and Restaurant.query.filter_by(id=data.order_rest_id).first():
                 current_month_total += data.order_total
                 rest_name = Restaurant.query.filter_by(id=data.order_rest_id).first().name
@@ -123,7 +124,7 @@ def stat2():
     rests_data, text = [], ''
     rest = Restaurant.query
     for data in stat_data:
-        if ('Подтверждена' or 'Заказ принят рестораном' in data.order_state) and rest.filter_by(
+        if ('Подтверждена' in data.order_state or 'Заказ принят рестораном' in data.order_state) and rest.filter_by(
                 id=data.order_rest_id).first():
             rest_name = rest.filter_by(id=data.order_rest_id).first().name
             day = str(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
@@ -149,7 +150,7 @@ def stat3():
     days = []
     for data in order_data:
         day = int(datetime.fromtimestamp(data.order_datetime).strftime("%d"))
-        if 'Подтверждена' or 'Заказ принят рестораном' in data.order_state:
+        if 'Подтверждена' in data.order_state or 'Заказ принят рестораном' in data.order_state:
             if day in days:
                 stat.update({day: stat[day] + 1})
             else:
