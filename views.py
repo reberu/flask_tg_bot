@@ -535,6 +535,7 @@ def webapp_data():
         phone = request.args.get('phone')
         address = request.args.get('address')
         total = request.args.get('total')
+        comment = request.args.get('comment')
         cart = Cart.query.filter_by(user_uid=uid).all()
         rest_id = Cart.query.filter_by(user_uid=uid).first().restaurant_id
         rest = Restaurant.query.filter_by(id=rest_id).first()
@@ -545,6 +546,8 @@ def webapp_data():
             text += f'Самовывоз\nАдрес ресторана: {rest.address}\n'
         text += f'Контактный номер: {phone}\nСумма заказа: {total}\n'
         text += 'Оплата наличными\n' if payment == "cash" else "Оплата картой\n"
+        if comment:
+            text += f'Комментарий: {comment}\n'
         text += f'Заказ отправлен, ждите ответа ресторана {rest.name}. ' \
                 'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
         BOT.send_message(chat_id=uid, text=text)
@@ -577,6 +580,8 @@ def webapp_data():
             text += f'{item.name} - {item.quantity} шт.\n'
         text += f'Общая сумма заказа: {total} р.\n'
         text += 'Оплата наличными\n' if payment == "cash" else "Оплата картой\n"
+        if comment:
+            text += f'Комментарий: {comment}\n'
         cb_data = f'order_{new_order.id}_change'
         kbd = InlineKeyboardMarkup()
         if method == 'delivery':

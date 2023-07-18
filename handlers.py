@@ -310,7 +310,7 @@ def cart_callback(call):
                 cb_time = f'order_confirm_change_time_takeaway_{pair.text}'
                 cb_phone = f'order_confirm_change_phone_takeaway_{pair.text}'
                 kbd = IKM()
-                kbd.add(IKB(text='Отправить', callback_data=f'order_id_confirm_takeaway_{pair.text}'))
+                kbd.add(IKB(text='Отправить', callback_data=f'order_id_confirm_takeaway_on_time_{pair.text}'))
                 kbd.add(IKB(text='Изменить время', callback_data=cb_time))
                 kbd.add(IKB(text='Изменить телефон', callback_data=cb_phone))
                 BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=kbd)
@@ -327,7 +327,7 @@ def cart_callback(call):
             cb_phone = f'order_confirm_change_phone_takeaway_{usr.phone}'
             db.session.commit()
             kbd = IKM()
-            kbd.add(IKB(text='Отправить', callback_data=f'order_id_confirm_takeaway_{time}'))
+            kbd.add(IKB(text='Отправить', callback_data=f'order_id_confirm_takeaway_on_time_{time}'))
             kbd.add(IKB(text='Изменить время', callback_data=cb_time))
             kbd.add(IKB(text='Изменить телефон', callback_data=cb_phone))
             BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=kbd)
@@ -694,9 +694,55 @@ def order_callback(call):
 
         return user_id, txt, kbd
 
+    def order_takeaway_confirm():
+        cart = Cart.query.filter_by(user_uid=call.from_user.id).all()
+        rstrnt = Restaurant.query.filter_by(id=cart[0].restaurant_id).first()
+        summ = db.session.query(func.sum(Cart.price * Cart.quantity)).filter_by(user_uid=call.from_user.id).all()
+        summ = summ[0][0] if summ[0][0] else 0
+        last_order = db.engine.execute("SELECT MAX(id) FROM Orders;").first()[0]
+        new_order = Order(
+            id=last_order + 1,
+            uid=call.from_user.id,
+            first_name=call.from_user.first_name,
+            last_name=call.from_user.last_name,
+            order_total=summ,
+            order_rest_id=rstrnt.id,
+            order_datetime=datetime.now(YKT).strftime('%s'),
+            order_confirm=False,
+            order_state="Заказ отправлен, ожидание ответа ресторана."
+        )
+        db.session.add(new_order)
+        txt = f'Заказ отправлен, ждите ответа ресторана {rstrnt.name}.\n' \
+              'За статусом заказа смотрите в "Мои заказы" в разделе Справка.'
+        BOT.send_message(chat_id=call.from_user.id, text=txt)
+        user = User.query.filter_by(uid=new_order.uid).first()
+        txt = f'Поступил заказ № {new_order.id}\nСостав заказа:\n'
+        for item in cart:
+            db.session.add(OD(
+                order_id=new_order.id,
+                order_dish_name=item.name,
+                order_dish_cost=item.price,
+                order_dish_id=item.dish_id,
+                order_dish_quantity=item.quantity,
+                order_rest_id=new_order.order_rest_id
+            ))
+            txt += f'{item.name} - {item.quantity} шт.\n'
+        txt += f'Общая сумма заказа: {summ} р.\nСамовывоз в {data[6]}\n'
+        cb_data = f'order_{new_order.id}_change'
+        tlg_link = 'Перейдите в чат-бот, чтобы обработать заказ https://t.me/robofood1bot'
+        kbd = IKM()
+        kbd.add(IKB(text='Принять', callback_data=f'order_{new_order.id}_accept_{0}_send'))
+        kbd.add(IKB(text='Не принят', callback_data='None'))
+        kbd.add(IKB(f'Изменить заказ № {new_order.id}', callback_data=cb_data))
+        Cart.query.filter_by(user_uid=call.from_user.id).delete()
+        db.session.commit()
+        del cart
+        send_email(rstrnt.email, f'Поступил заказ из Robofood № {new_order.id}', txt + tlg_link)
+        return rstrnt.service_uid, txt, kbd
+
     actions = {
         2: order_confirm, 3: order_triple_actions, 4: order_quadruple_actions,
-        5: order_quintuple_actions, 6: order_confirm_change_actions
+        5: order_quintuple_actions, 6: order_confirm_change_actions, 7: order_takeaway_confirm
     }
     uid, text, keyboard = actions.get(len(data))()
     BOT.send_message(chat_id=uid, text=text, reply_markup=keyboard, parse_mode='HTML')
@@ -781,8 +827,8 @@ def other_callback(call):
             query = db.session.query(
                 Restaurant.id, Restaurant.name, Dish.name, Dish.composition, Dish.cost, Dish.img_link, Dish.id,
                 SpecialDish.category_id, Restaurant.address).filter(SpecialDish.subcat_id == subcat_id,
-                                                SpecialDish.rest_id == Restaurant.id,
-                                                SpecialDish.dish_id == Dish.id).all()
+                                                                    SpecialDish.rest_id == Restaurant.id,
+                                                                    SpecialDish.dish_id == Dish.id).all()
             for item in query:
                 rest_info = RestaurantInfo.query.filter_by(rest_id=item[0]).first()
                 delivery_time = rest_info.delivery_time if rest_info else 'с ожиданием'

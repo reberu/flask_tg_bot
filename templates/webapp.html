@@ -86,12 +86,17 @@
     tg.expand();
     tg.MainButton.hide();
     tg.BackButton.hide();
-    let uid = tg.initDataUnsafe.user.id;
-    // let uid = 113737020;
+    // let uid = tg.initDataUnsafe.user.id;
+    let uid = 113737020;
     document.getElementById("hiddenUid").innerHTML = uid;
     let dishId = $("#hiddenMainDishId").text()
     let amount = 0;
     $(document).ready(function(){
+        if (dishId) {
+          let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
+          let vh = window.innerHeight * 0.06;
+          window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
+        }
         let x = document.getElementsByClassName("scrollNav-active");
         if(x.length > 0) { x[0].classList.remove("scrollNav-active"); }
         $(".scrollNav-links").first().addClass("scrollNav-active");
@@ -268,7 +273,7 @@
         .then(function (json) {
           var data = JSON.stringify(json);
           document.getElementById("main").style.display = "none";
-          document.getElementById("mainButton").innerHTML = "Оформить заказ";
+          document.getElementById("mainButton").innerHTML = "Продолжить";
           document.getElementById("cart").style.display = "block";
           let items = JSON.parse(data);
           var cart = document.getElementById("cart");
@@ -402,9 +407,9 @@
           }
         });
         tg.BackButton.show();
-      } else if (document.getElementById("mainButton").innerHTML === "Оформить заказ") {
+      } else if (document.getElementById("mainButton").innerHTML === "Продолжить") {
         document.getElementById("cart").style.display = "none";
-        document.getElementById("mainButton").innerHTML = "Продолжить";
+        document.getElementById("mainButton").innerHTML = "Оформить заказ";
         document.getElementById("final").style.display = "block";
         fetch("/webapp_confirm?" + new URLSearchParams({uid: uid}))
         .then(function (response) { return response.json(); })
@@ -417,6 +422,9 @@
           finalWrapDiv.id = "finalWrap";
           let newP1 = document.createElement('p');
           newP1.innerHTML = "Способ получения заказа";
+          newP1.onclick = function() {
+            document.activeElement.blur();
+          };
           finalWrapDiv.appendChild(newP1);
 
           let div1 = document.createElement('div');
@@ -447,6 +455,9 @@
 
           let newP2 = document.createElement('p');
           newP2.innerHTML = "Способ оплаты";
+          newP2.onclick = function() {
+            document.activeElement.blur();
+          };
           finalWrapDiv.appendChild(newP2);
 
           let div2 = document.createElement('div');
@@ -477,6 +488,9 @@
 
           let newP3 = document.createElement('p');
           newP3.innerHTML = "Информация";
+          newP3.onclick = function() {
+            document.activeElement.blur();
+          };
           finalWrapDiv.appendChild(newP3);
 
           let div3 = document.createElement('div');
@@ -508,6 +522,9 @@
 
           let newP4 = document.createElement('p');
           newP4.innerHTML = "Итого";
+          newP4.onclick = function() {
+            document.activeElement.blur();
+          };
           finalWrapDiv.appendChild(newP4);
 
           let div4 = document.createElement('div');
@@ -523,11 +540,12 @@
 
           final.appendChild(finalWrapDiv);
         });
-      } else if (document.getElementById("mainButton").innerHTML === "Продолжить") {
+      } else if (document.getElementById("mainButton").innerHTML === "Оформить заказ") {
         let userPhone = $("#input-phone").val();
         let userAddress = $("#input-address").val();
         let orderType = "delivery";
         let paymentMethod = $("#hiddenPaymentMethod").text();
+        let userComment = $("#input-comment").val();
         if (window.getComputedStyle(document.getElementById("input-address")).display === "none") {
           orderType = "takeaway";
         }
@@ -552,7 +570,8 @@
             payment: paymentMethod,
             phone: userPhone,
             address: userAddress,
-            total: userTotal
+            total: userTotal,
+            comment: userComment
           })).then(function(response) {
             tg.close();
           });
@@ -626,10 +645,9 @@
         }
       } else if (window.getComputedStyle(document.getElementById("final")).display !== "none") {
         tg.BackButton.show();
-        // something to do with finalWrap
         $("#finalWrap").remove();
         $("#cart").show();
-        $("#mainButton").html("Оформить заказ");
+        $("#mainButton").html("Продолжить");
       } else if (window.getComputedStyle(document.getElementById("restTerms")).display !== "none") {
         tg.BackButton.hide();
         $("#restTerms").hide();
@@ -637,7 +655,6 @@
         $("#mainButton").css('visibility', 'visible');
       } else if (window.getComputedStyle(document.getElementById("dishItem")).display !== "none") {
         tg.BackButton.hide();
-        // something to do with dishItemsMain child node
         $("#dishItemScriptSrc").remove();
         dishId = $(".flex-dishItem-container").attr("id").split("-")[2];
         $(".flex-dishItem-container").remove();
