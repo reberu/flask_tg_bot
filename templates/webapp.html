@@ -86,13 +86,20 @@
     tg.expand();
     tg.MainButton.hide();
     tg.BackButton.hide();
-    // let uid = tg.initDataUnsafe.user.id;
-    let uid = 113737020;
+    let uid = 0;
+    try {
+      uid = tg.initDataUnsafe.user.id;
+    }
+    catch (err) {
+      uid = 113737020;
+    }
+    var hasBeenClicked = false;
     document.getElementById("hiddenUid").innerHTML = uid;
     let dishId = $("#hiddenMainDishId").text()
     let amount = 0;
     $(document).ready(function(){
-        if (dishId) {
+        if (dishId !== "None") {
+          console.log(dishId);
           let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
           let vh = window.innerHeight * 0.06;
           window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
@@ -122,10 +129,12 @@
         });
     });
     $('img[id^="img-item-"]').click(function(){
-      let category = "category-" + $(this).parent().attr("class").split("-")[2];
       let itemId = $(this).attr("id").split("-")[2];
+      let category = "category-" + $(this).parent().attr("class").split("-")[2];
       $("#hiddenCurrentDishId").html(itemId);
-      fetch("/webapp_item?" + new URLSearchParams({uid: uid, item: itemId, category: category}))
+      if (!hasBeenClicked) {
+        hasBeenClicked = true;
+        fetch("/webapp_item?" + new URLSearchParams({uid: uid, item: itemId, category: category}))
         .then(function (response) { return response.json(); })
         .then(function (json) {
           var data = JSON.stringify(json);
@@ -199,6 +208,12 @@
           document.getElementById("hiddenDishItemDishId").innerHTML = item.dishId;
       });
       tg.BackButton.show();
+      setTimeout(function(){
+        hasBeenClicked = false;
+      }, 1000);
+      } else {
+        // do nothing
+      }
     });
     $(".nav-items").on("click", function() {
         $(".nav-items").children("a").css("background-color", "#F8F8F8");
