@@ -1,32 +1,32 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-   <meta charset="UTF-8">
-   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <title>Robofood webapp</title>
-   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
-   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-   <link rel="stylesheet" href="/static/webapp.css">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, virtual-keyboard=overlays-content">
+  <title>Robofood webapp</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+<link rel="stylesheet" href="/static/webapp.css">
 </head>
 <body>
   <div id="main">
     <div class="nav-bar fixed-top">
-        {% for category in categories %}
-            {% if category.restaurant_id == rest.id %}
-                <div id="nav-category-{{category.id}}" class="nav-items"><a href="#category-{{category.id}}" class="scrollNav-links" id="link-category-{{category.id}}">{{ category.name }}</a></div>
-            {% endif %}
-        {% endfor %}
+      {% for category in categories %}
+        {% if category.restaurant_id == rest.id %}
+          <div id="nav-category-{{category.id}}" class="nav-items"><a href="#category-{{category.id}}" class="scrollNav-links" id="link-category-{{category.id}}">{{ category.name }}</a></div>
+        {% endif %}
+      {% endfor %}
     </div>
     <div class="rest-card">
-        <div class="rest-name">{{ rest.name }}</div>
-        <div class="rest-info">Время доставки: {{info.delivery_time}}<br>Адрес самовывоза: {{info.takeaway_address}}</div>
+      <div class="rest-name">{{ rest.name }}</div>
+      <div class="rest-info">Время доставки: {{info.delivery_time}}<br>Адрес самовывоза: {{info.takeaway_address}}</div>
     </div>
     <div class="flex-container rest_{{rest.id}}" id="wrapper">
        <div id="divTerms" class="item terms">
-           <img src="{{ info.img if info.img else '/static/dummy_rest.jpg' }}">
-           <div class="dish-name"><b>Условия доставки</b></div>
+         <img src="{{ info.img if info.img else '/static/dummy_rest.jpg' }}">
+         <div class="dish-name"><b>Условия доставки</b></div>
        </div>
         {% for category in categories %}
             {% if category.restaurant_id == rest.id %}
@@ -239,8 +239,8 @@
           data: {"uid": uid, "dish_id": $(this).attr("id").split("-")[1], "quantity": 1, "method": "create"},
           success: function(data) {
             $("#hiddenTotal").html(data.total);
+            amount = $("#hiddenTotal").html();
             $("#amount-btn-" + data.dish_id).html(data.quantity);
-            amount += Number(cost);
             $("#itemCard-" + data.dish_id).css("border-bottom", "thick double #0275D8");
             document.getElementById("mainButton").innerHTML = "Корзина " + amount + " ₽";
           },
@@ -513,9 +513,13 @@
           let input1 = document.createElement('input');
           input1.id = "input-phone";
           input1.type = "text";
+          input1.inputmode = "numeric";
           input1.className = "form-control";
           input1.ariaLabel = "Номер телефона";
           input1.placeholder = "Номер телефона";
+          input1.onclick = function() {
+
+          };
           if (typeof items.phone !== "undefined") { input1.value = items.phone; }
           div3.appendChild(input1);
           let input2 = document.createElement('input');
@@ -544,6 +548,7 @@
 
           let div4 = document.createElement('div');
           div4.className = 'summary';
+          div4.style = 'padding-bottom: 10vh;'
           let subDiv1 = document.createElement('div');
           subDiv1.innerHTML = "Сумма";
           div4.appendChild(subDiv1);
@@ -552,6 +557,9 @@
           subDiv2.innerHTML = items.total;
           div4.appendChild(subDiv2);
           finalWrapDiv.appendChild(div4);
+
+          let div5 = document.createElement('div');
+          finalWrapDiv.appendChild(div5);
 
           final.appendChild(finalWrapDiv);
         });
