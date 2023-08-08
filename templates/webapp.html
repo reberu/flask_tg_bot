@@ -79,6 +79,7 @@
   </div>
   <div id="hiddenTotal" style="display:none;"></div>
   <div id="hiddenCurrentDishId" style="display:none;"></div>
+  <div id="hiddenTermsViewFlag" style="display:none;">{{terms_view}}</div>
 </body>
 <script>
     let tg = window.Telegram.WebApp;
@@ -295,130 +296,141 @@
           let cartDishId = 0;
           let quantity = 0;
           let uid = $("#hiddenUid").text();
-          for (let key in items.items) {
+          if (Object.keys(items.items).length === 0) {
+            $("#mainButton").hide();
             let newDiv = document.createElement('div');
-            newDiv.id = 'dish-'+key;
-            newDiv.className = 'grid-container';
-
-            let div1 = document.createElement('div');
-            div1.className = 'item1';
-            let img1 = document.createElement('img');
-            img1.src = items.items[key].img_link
-            div1.appendChild(img1);
-            newDiv.appendChild(div1);
-
-            let div2 = document.createElement('div');
-            div2.className = 'item2';
-            let img2 = document.createElement('img');
-            img2.src = items.items[key].img_link
-            div2.appendChild(img2);
-            newDiv.appendChild(div2);
-
-            let div3 = document.createElement('div');
-            div3.className = 'item3';
-            let divKey1 = document.createElement('div');
-            divKey1.innerText = items.items[key].name;
-            div3.appendChild(divKey1);
-            newDiv.appendChild(div3);
-
-            let div4 = document.createElement('div');
-            div4.className = 'item4';
-            let divKey2 = document.createElement('div');
-            divKey2.innerHTML = items.items[key].name;
-            div4.appendChild(divKey2);
-            newDiv.appendChild(div4);
-
-            let div5 = document.createElement('div');
-            div5.className = 'item5';
-            let divKey3 = document.createElement('div');
-            divKey3.innerText = items.items[key].name;
-            div5.appendChild(divKey3);
-            newDiv.appendChild(div5);
-
-            let div6 = document.createElement('div');
-            div6.className = 'item6';
-            let divControl1 = document.createElement('div');
-            divControl1.id = 'btn-rem-'+key;
-            divControl1.className = 'btn plusminus cartPlusMinus';
-            divControl1.onclick = function() {
-              let opts = {"uid": uid, "dish_id": divControl1.id.split("-")[2], "quantity": "1", "method": "update", "operation": "rem"};
-              $.ajax({
-                url: '/webapp/data',
-                type: 'POST',
-                data: opts,
-                dataType: 'json',
-                success: function(data) {
-                  dishId = data.dish_id;
-                  quantity = data.quantity;
-                  if (data.quantity == 0) {
-                    $("#item-btn-" + key).hide();
-                    $("#btn-" + key).show();
-                    $("#dish-" + data.dish_id).remove();
-                    $("#itemCard-" + data.dish_id).css("border-bottom", "");
-                  }
-                  $("#amountCart-btn-" + data.dish_id).html(data.quantity);
-                  $("#hiddenTotal").html(Number($("#hiddenTotal").html()) - Number(data.cost));
-                  $("#total1-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
-                  $("#total2-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
-                },
-              });
-            };
-            divControl1.innerHTML = '-';
-            div6.appendChild(divControl1);
-            newDiv.appendChild(div6);
-
-            let div7 = document.createElement('div');
-            div7.className = 'item7';
-            let divControl2 = document.createElement('div');
-            divControl2.id = 'amountCart-btn-'+key;
-            divControl2.className = 'btn';
-            divControl2.innerHTML = items.items[key].quantity;
-            div7.appendChild(divControl2);
-            newDiv.appendChild(div7);
-
-            let div8 = document.createElement('div');
-            div8.className = 'item8';
-            let divControl3 = document.createElement('div');
-            divControl3.id = 'btn-add-'+key;
-            divControl3.className = 'btn plusminus cartPlusMinus';
-            divControl3.onclick = function() {
-              let opts = {"uid": uid, "dish_id": divControl1.id.split("-")[2], "quantity": "1", "method": "update", "operation": "add"};
-              $.ajax({
-                url: '/webapp/data',
-                type: 'POST',
-                data: opts,
-                dataType: 'json',
-                success: function(data) {
-                  dishId = data.dish_id;
-                  quantity = data.quantity;
-                  $("#amountCart-btn-" + data.dish_id).html(data.quantity);
-                  $("#hiddenTotal").html(Number($("#hiddenTotal").html()) + Number(data.cost));
-                  $("#total1-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
-                  $("#total2-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
-                },
-              });
-            };
-            divControl3.innerHTML = '+';
-            div8.appendChild(divControl3);
-            newDiv.appendChild(div8);
-
-            let div9 = document.createElement('div');
-            div9.className = 'item9';
-            div9.id = 'total1-' + key;
-            let cost1 = document.createElement('p');
-            cost1.innerHTML = Number(items.items[key].quantity) * Number(items.items[key].cost);
-            div9.appendChild(cost1);
-            newDiv.appendChild(div9);
-
-            let div10 = document.createElement('div');
-            div10.className = 'item10';
-            div10.id = 'total2-' + key;
-            let cost2 = document.createElement('p');
-            cost2.innerHTML = Number(items.items[key].quantity) * Number(items.items[key].cost);
-            div10.appendChild(cost2);
-            newDiv.appendChild(div10);
-
+            newDiv.id = "emptyCart";
+            newDiv.innerHTML = 'Ваша корзина пуста';
+            newDiv.style.color = 'gray';
+            newDiv.style.padding = '5vh';
+            newDiv.style.textAlign = 'center';
             cart.appendChild(newDiv);
+          } else {
+            for (let key in items.items) {
+              let newDiv = document.createElement('div');
+              newDiv.id = 'dish-'+key;
+              newDiv.className = 'grid-container';
+
+              let div1 = document.createElement('div');
+              div1.className = 'item1';
+              let img1 = document.createElement('img');
+              img1.src = items.items[key].img_link
+              div1.appendChild(img1);
+              newDiv.appendChild(div1);
+
+              let div2 = document.createElement('div');
+              div2.className = 'item2';
+              let img2 = document.createElement('img');
+              img2.src = items.items[key].img_link
+              div2.appendChild(img2);
+              newDiv.appendChild(div2);
+
+              let div3 = document.createElement('div');
+              div3.className = 'item3';
+              let divKey1 = document.createElement('div');
+              divKey1.innerText = items.items[key].name;
+              div3.appendChild(divKey1);
+              newDiv.appendChild(div3);
+
+              let div4 = document.createElement('div');
+              div4.className = 'item4';
+              let divKey2 = document.createElement('div');
+              divKey2.innerHTML = items.items[key].name;
+              div4.appendChild(divKey2);
+              newDiv.appendChild(div4);
+
+              let div5 = document.createElement('div');
+              div5.className = 'item5';
+              let divKey3 = document.createElement('div');
+              divKey3.innerText = items.items[key].name;
+              div5.appendChild(divKey3);
+              newDiv.appendChild(div5);
+
+              let div6 = document.createElement('div');
+              div6.className = 'item6';
+              let divControl1 = document.createElement('div');
+              divControl1.id = 'btn-rem-'+key;
+              divControl1.className = 'btn plusminus cartPlusMinus';
+              divControl1.onclick = function() {
+                let opts = {"uid": uid, "dish_id": divControl1.id.split("-")[2], "quantity": "1", "method": "update", "operation": "rem"};
+                $.ajax({
+                  url: '/webapp/data',
+                  type: 'POST',
+                  data: opts,
+                  dataType: 'json',
+                  success: function(data) {
+                    dishId = data.dish_id;
+                    quantity = data.quantity;
+                    if (data.quantity == 0) {
+                      $("#item-btn-" + key).hide();
+                      $("#btn-" + key).show();
+                      $("#dish-" + data.dish_id).remove();
+                      $("#itemCard-" + data.dish_id).css("border-bottom", "");
+                    }
+                    $("#amountCart-btn-" + data.dish_id).html(data.quantity);
+                    $("#hiddenTotal").html(Number($("#hiddenTotal").html()) - Number(data.cost));
+                    $("#total1-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                    $("#total2-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                  },
+                });
+              };
+              divControl1.innerHTML = '-';
+              div6.appendChild(divControl1);
+              newDiv.appendChild(div6);
+
+              let div7 = document.createElement('div');
+              div7.className = 'item7';
+              let divControl2 = document.createElement('div');
+              divControl2.id = 'amountCart-btn-'+key;
+              divControl2.className = 'btn';
+              divControl2.innerHTML = items.items[key].quantity;
+              div7.appendChild(divControl2);
+              newDiv.appendChild(div7);
+
+              let div8 = document.createElement('div');
+              div8.className = 'item8';
+              let divControl3 = document.createElement('div');
+              divControl3.id = 'btn-add-'+key;
+              divControl3.className = 'btn plusminus cartPlusMinus';
+              divControl3.onclick = function() {
+                let opts = {"uid": uid, "dish_id": divControl1.id.split("-")[2], "quantity": "1", "method": "update", "operation": "add"};
+                $.ajax({
+                  url: '/webapp/data',
+                  type: 'POST',
+                  data: opts,
+                  dataType: 'json',
+                  success: function(data) {
+                    dishId = data.dish_id;
+                    quantity = data.quantity;
+                    $("#amountCart-btn-" + data.dish_id).html(data.quantity);
+                    $("#hiddenTotal").html(Number($("#hiddenTotal").html()) + Number(data.cost));
+                    $("#total1-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                    $("#total2-" + data.dish_id).html(Number($("#amountCart-btn-" + data.dish_id).html()) * Number(data.cost));
+                  },
+                });
+              };
+              divControl3.innerHTML = '+';
+              div8.appendChild(divControl3);
+              newDiv.appendChild(div8);
+
+              let div9 = document.createElement('div');
+              div9.className = 'item9';
+              div9.id = 'total1-' + key;
+              let cost1 = document.createElement('p');
+              cost1.innerHTML = Number(items.items[key].quantity) * Number(items.items[key].cost);
+              div9.appendChild(cost1);
+              newDiv.appendChild(div9);
+
+              let div10 = document.createElement('div');
+              div10.className = 'item10';
+              div10.id = 'total2-' + key;
+              let cost2 = document.createElement('p');
+              cost2.innerHTML = Number(items.items[key].quantity) * Number(items.items[key].cost);
+              div10.appendChild(cost2);
+              newDiv.appendChild(div10);
+
+              cart.appendChild(newDiv);
+            }
           }
         });
         tg.BackButton.show();
@@ -651,20 +663,35 @@
           $("#restTerms").show();
         }
       );
+    if ($("#hiddenTermsViewFlag").text() === 'True') {
+      tg.BackButton.show();
+      $("#mainButton").css('visibility', 'hidden');
+      $("#main").hide();
+      $("#restTerms").show();
+    }
     Telegram.WebApp.onEvent('backButtonClicked', function(){
       if (window.getComputedStyle(document.getElementById("cart")).display !== "none") {
         tg.BackButton.hide();
-        dishId = $(".grid-container").first().attr("id").split("-")[1];
-        $(".grid-container").remove();
         $("#main").show();
+        $("#mainButton").html("Корзина");
+        $("#mainButton").show();
         let subtotal = $("#hiddenTotal").html();
+        try {
+          $("#emptyCart").remove();
+        } catch(e) {
+          console.log(e);
+        }
+        try {
+          dishId = $(".grid-container").first().attr("id").split("-")[1];
+          $(".grid-container").remove();
+        } catch(e) {
+          console.log(e);
+        }
         if (subtotal != 0) {
           $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
           let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
           let vh = window.innerHeight * 0.06;
           window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
-        } else {
-          $("#mainButton").html("Корзина");
         }
       } else if (window.getComputedStyle(document.getElementById("final")).display !== "none") {
         tg.BackButton.show();
@@ -676,6 +703,12 @@
         $("#restTerms").hide();
         $("#main").show();
         $("#mainButton").css('visibility', 'visible');
+        if ($('.elements[style*="display: flex"]').attr('id')) {
+          let dishId = $('.elements[style*="display: flex"]').attr('id').split('-')[2];
+          let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
+          let vh = window.innerHeight * 0.06;
+          window.scrollTo({ top: scrollDiv - vh, behavior: 'smooth'});
+        }
       } else if (window.getComputedStyle(document.getElementById("dishItem")).display !== "none") {
         tg.BackButton.hide();
         $("#dishItemScriptSrc").remove();

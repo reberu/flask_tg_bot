@@ -20,7 +20,7 @@ def restaurant_callback(call):
     categories = Category.query.filter_by(restaurant_id=rest_id)
     rest = Restaurant.query.filter_by(id=rest_id).first()
     webapp = WebAppInfo(BASE_URL + f"webapp/{rest_id}?uid={call.from_user.id}")
-    webapp_info = WebAppInfo(BASE_URL + f"webapp_info/{rest.id}")
+    webapp_info = WebAppInfo(BASE_URL + f"webapp/{rest.id}?uid={call.from_user.id}&terms_view=true")
 
     def categories_menu():
         kbd = IKM()

@@ -365,8 +365,10 @@ def webapp():
 
 @app.route('/webapp/<int:Number>', methods=['GET'])
 def webapp_main(Number):
+    terms_view = False
     try:
         uid = int(request.args.get('uid'))
+        terms_view = True if request.args.get('terms_view') == 'true' else False
     except Exception as e:
         print("Exception of int(request.args.get('uid')) is:", e)
         uid = None
@@ -385,9 +387,8 @@ def webapp_main(Number):
         dish_id = request.args.get('dishId', type=str)
     except Exception as e:
         print(e)
-    return render_template(
-        'webapp.html', dishes=dishes, categories=categories, rest=rest, info=info, dish_id=dish_id, terms=terms
-    )
+    return render_template('webapp.html', dishes=dishes, categories=categories, rest=rest, info=info,
+                           dish_id=dish_id, terms=terms, terms_view=terms_view)
 
 
 @app.route('/webapp_rest/<int:Number>', methods=['GET'])
