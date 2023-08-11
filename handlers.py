@@ -7,7 +7,7 @@ from telebot import formatting
 from telebot.types import InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB, WebAppInfo
 from app import db, send_email
 from models import Category, Restaurant, PromoDish, Dish, Cart, RestaurantDeliveryTerms, User, Order, Favorites, \
-    SpecialDish, TextMenuMessage as Menu, RestaurantInfo, TextMenuMessage
+    SpecialDish, TextMenuMessage as Menu, RestaurantInfo, TextMenuMessage, OrderDetail
 from models import OrderDetail as OD
 from settings import BOT, YKT, RULES, BASE_URL
 from utils import rest_menu_keyboard, write_history
@@ -524,8 +524,9 @@ def order_callback(call):
             txt += 'Состав Вашего заказа:\n'
             txt += ''.join(f'{item.order_dish_name} - {item.order_dish_quantity} шт.\n' for item in details)
             txt += f'На общую сумму - {order.order_total} р.'
+            cb_data = f'order_{order.id}_user_{user_id}_rest_{rest.id}_change_1'
             kbd.add(IKB(text='Оформить заказ', callback_data=f'order_{order.id}_user_confirm'))
-            kbd.add(IKB(text='Изменить заказ', callback_data=f'order_{order.id}_user_change'))
+            kbd.add(IKB(text='Изменить заказ', callback_data=cb_data))
             kbd.add(IKB(text='Отменить заказ', callback_data=f'order_{order.id}_user_cancel'))
             user_id = order.uid
         return user_id, txt, kbd
@@ -740,13 +741,65 @@ def order_callback(call):
         send_email(rstrnt.email, f'Поступил заказ из Robofood № {new_order.id}', txt + tlg_link)
         return rstrnt.service_uid, txt, kbd
 
+    def order_user_change():
+        order = Order.query.filter_by(id=int(data[1])).first()
+        user_id = order.uid
+        rest = Restaurant.query.filter_by(id=order.order_rest_id).first()
+        details = OD.query.filter_by(order_id=order.id).all()
+        total = db.session.query(func.sum(OrderDetail.order_dish_cost * OrderDetail.order_dish_quantity)).\
+            filter_by(order_id=order.id).all()
+        total = total[0][0] if total[0][0] else 0
+        for item in details:
+            cart_item = Cart(
+                name=item.order_dish_name,
+                price=item.order_dish_cost,
+                quantity=item.order_dish_quantity,
+                user_uid=user_id,
+                is_dish=True,
+                is_water=False,
+                dish_id=item.order_dish_id,
+                restaurant_id=item.order_rest_id,
+                service_uid=rest.service_uid
+            )
+            db.session.add(cart_item)
+            db.session.commit()
+        OD.query.filter_by(order_id=int(data[1])).delete()
+        Order.query.filter_by(id=int(data[1])).delete()
+        db.session.commit()
+        txt = f'Ресторан {rest.name} приносит извинения и сообщает что отсутствует одно из блюд. '
+        txt += 'Что можно сделать: Добавить другое блюдо через кнопку “Меню” или просто оформить измененный заказ\n'
+        kbd = IKM()
+        cart = Cart.query.filter_by(user_uid=user_id).all()
+        row = [IKB(text='❌', callback_data=f'cart_item_id_{cart[0].id}_clear')]
+        for i, item in enumerate(cart, start=1):
+            row.append(IKB(text=str(i), callback_data=f'cart_item_id_{item.id}'))
+        kbd.row(*row)
+        cart_dish_id = None if not cart else db.session.query(Cart.dish_id).filter(Cart.id == cart[0].id).first()[0]
+        current_dish = Dish.query.filter_by(id=cart_dish_id).first()
+        cart_count = db.session.query(Cart.quantity).filter(Cart.id == cart[0].id).first()[0]
+        txt += f'<a href="{current_dish.img_link}">{rest.name}</a>\n{current_dish.name}\n{current_dish.composition}\n'
+        txt += str(cart[0].price)
+        kbd.row(
+            IKB('-️', callback_data=f'cart_item_id_{cart[0].id}_remove'),
+            IKB(f'{cart_count} шт.', callback_data='None'),
+            IKB('+️', callback_data=f'cart_item_id_{cart[0].id}_add')
+        )
+        kbd.row(
+            IKB('Очистить️', callback_data=f'purge'),
+            IKB(text='Меню️️', web_app=WebAppInfo(BASE_URL + f"webapp/{cart[0].restaurant_id}?dishId={cart_dish_id}"))
+        )
+        kbd.add(IKB(f'Оформить заказ на сумму {total}', callback_data='cart_confirm'))
+        return user_id, txt, kbd
+
     actions = {
         2: order_confirm, 3: order_triple_actions, 4: order_quadruple_actions,
-        5: order_quintuple_actions, 6: order_confirm_change_actions, 7: order_takeaway_confirm
+        5: order_quintuple_actions, 6: order_confirm_change_actions, 7: order_takeaway_confirm, 8: order_user_change
     }
     uid, text, keyboard = actions.get(len(data))()
-    BOT.send_message(chat_id=uid, text=text, reply_markup=keyboard, parse_mode='HTML')
-    write_history(call.message.id, call.from_user.id, text, True)
+    try:
+        BOT.send_message(chat_id=uid, text=text, reply_markup=keyboard, parse_mode='HTML')
+    except Exception as e:
+        print(e)
 
 
 def favorites_callback(call):

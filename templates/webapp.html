@@ -599,7 +599,8 @@
           $("#input-address").on("input", function() {
             userAddress = $(this).val();
           });
-          fetch("/webapp/data?" + new URLSearchParams({
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", "/webapp/data?" + new URLSearchParams({
             uid: uid,
             method: orderType,
             payment: paymentMethod,
@@ -607,10 +608,9 @@
             address: userAddress,
             total: userTotal,
             comment: userComment
-          })).then(function(response) {
-            tg.close();
-          });
-          // tg.close();
+          }));
+          xhr.send();
+          tg.close();
         }
       } else if (document.getElementById("mainButton").innerHTML.indexOf("Добавить") !== -1) {
         let subtotal = $("#hiddenTotal").html();
@@ -675,6 +675,7 @@
         $("#main").show();
         $("#mainButton").html("Корзина");
         $("#mainButton").show();
+        $("#cart").hide();
         let subtotal = $("#hiddenTotal").html();
         try {
           $("#emptyCart").remove();
@@ -728,7 +729,6 @@
         if (subtotal != 0) {
           $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
         } else {
-          $("#main").show();
           $("#mainButton").html("Корзина");
         }
       }
