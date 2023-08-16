@@ -124,12 +124,6 @@ def webhook():
         update = Update.de_json(request.stream.read().decode('utf-8'))
         BOT.process_new_updates([update])
         check_user(update.message.json)
-        write_history(
-            msg_id=update.message.json["message_id"],
-            chat_id=update.message.json["chat"]["id"],
-            text=update.message.json["text"],
-            is_bot=False
-        )
     except Exception as e:
         print("app route / error: ", e)
     return 'Ok', 200
