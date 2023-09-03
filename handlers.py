@@ -140,7 +140,7 @@ def restaurant_callback(call):
             webapp = WebAppInfo(BASE_URL + f"webapp/{rest_id}?dishId={dish.id}&uid={call.from_user.id}")
             keyboard.row(IKB('Инфо', web_app=webapp_info))
             keyboard.add(IKB(f'В корзину: заказ на сумму {total} р.', callback_data='cart'))
-            keyboard.add(IKB(f'Добавить другие блюда', web_app=webapp))
+            keyboard.add(IKB(f'Добавить другие', web_app=webapp))
         BOT.edit_message_reply_markup(
             chat_id=call.from_user.id,
             message_id=call.message.id,
@@ -191,6 +191,7 @@ def restaurant_callback(call):
         write_history(call.message.id, call.from_user.id, text, True)
 
     def delivery_time_change():
+        print('delivery_time_change handler')
         text = f'Укажите только адрес доставки для ресторана {rest.name}'
         msg = BOT.send_message(text=text, chat_id=call.from_user.id)
         BOT.register_next_step_handler(msg, delivery_time_change_address)
@@ -265,7 +266,6 @@ def cart_callback(call):
     def cart_confirm_options():
         user = User.query.filter_by(uid=call.from_user.id).first()
         option = call.data.split('_')[2]
-        print(option)
 
         def delivery():
             try:
@@ -276,8 +276,8 @@ def cart_callback(call):
                 BOT.send_message(chat_id=call.from_user.id, text=text, reply_markup=keyboard)
             except AttributeError:
                 text = 'Укажите адрес доставки. Улица, дом, кв, подъезд:'
-                mesg = BOT.send_message(text=text, chat_id=call.from_user.id)
-                BOT.register_next_step_handler(mesg, cart_delivery_address)
+                address_msg = BOT.send_message(text=text, chat_id=call.from_user.id)
+                BOT.register_next_step_handler(address_msg, cart_delivery_address)
             write_history(call.message.id, call.from_user.id, text, True)
 
         opts = {
@@ -289,8 +289,8 @@ def cart_callback(call):
             usr = User.query.filter_by(uid=pair.chat.id).first()
             usr.address = pair.text
             db.session.commit()
-            mesg = BOT.send_message(chat_id=pair.chat.id, text='Укажите номер телефона')
-            BOT.register_next_step_handler(mesg, cart_delivery_phone)
+            delivery_msg = BOT.send_message(chat_id=pair.chat.id, text='Укажите номер телефона')
+            BOT.register_next_step_handler(delivery_msg, cart_delivery_phone)
 
         def cart_delivery_phone(pair):
             usr = User.query.filter_by(uid=pair.chat.id).first()
@@ -304,6 +304,8 @@ def cart_callback(call):
 
         def cart_takeaway(pair):
             usr = User.query.filter_by(uid=pair.chat.id).first()
+            usr.address = pair.text
+            db.session.commit()
             text, kbd = 'Укажите номер телефона для самовывоза:', None
             if usr.phone:
                 text = f'Вы указали:\nСамовывоз: {pair.text}\nКонтактный номер: {usr.phone}'
@@ -315,8 +317,8 @@ def cart_callback(call):
                 kbd.add(IKB(text='Изменить телефон', callback_data=cb_phone))
                 BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=kbd)
             else:
-                mesg = BOT.send_message(chat_id=pair.chat.id, text=text)
-                BOT.register_next_step_handler(mesg, cart_takeaway_phone, pair.text)
+                else_msg = BOT.send_message(chat_id=pair.chat.id, text=text)
+                BOT.register_next_step_handler(else_msg, cart_takeaway_phone, pair.text)
 
         def cart_takeaway_phone(pair, time):
             usr = User.query.filter_by(uid=pair.chat.id).first()
@@ -333,8 +335,11 @@ def cart_callback(call):
             BOT.send_message(chat_id=pair.chat.id, text=text, reply_markup=kbd)
 
         if option in opts:
-            msg = BOT.send_message(chat_id=call.from_user.id, text=opts.get(option))
-            BOT.register_next_step_handler(msg, cart_delivery_address if option == 'change' else cart_takeaway)
+            mesg = BOT.send_message(chat_id=call.from_user.id, text=opts.get(option))
+            if option == 'change':
+                BOT.register_next_step_handler(mesg, cart_delivery_address)
+            else:
+                BOT.register_next_step_handler(mesg, cart_takeaway)
         else:
             delivery()
 
@@ -459,11 +464,13 @@ def order_callback(call):
 
     def order_confirm_change_actions():
         action = call.data.split('_')[3]
-        txt = 'Напишите во сколько хотите забрать Ваш заказ.'
-        if action == 'phone':
-            txt = 'Укажите номер телефона для самовывоза:'
+        txt = 'Укажите номер телефона для самовывоза:' if action == 'phone' else 'Напишите во сколько хотите забрать ' \
+                                                                                 'Ваш заказ. '
         msg = BOT.send_message(chat_id=call.from_user.id, text=txt)
-        BOT.register_next_step_handler(msg, order_takeaway_phone if action == 'phone' else order_takeaway_time)
+        if action == 'phone':
+            BOT.register_next_step_handler(msg, order_takeaway_phone)
+        else:
+            BOT.register_next_step_handler(msg, order_takeaway_time)
 
     def order_takeaway_time(pair):
         usr = User.query.filter_by(uid=pair.chat.id).first()
@@ -476,11 +483,17 @@ def order_callback(call):
         usr = User.query.filter_by(uid=pair.chat.id).first()
         usr.phone = pair.text
         db.session.commit()
-        txt = f'Вы указали:\nАдрес доставки: {usr.address}\nКонтактный номер: {usr.phone}'
+        txt = f'Вы указали:\nСамовывоз: {usr.address}\nКонтактный номер: {usr.phone}'
         kbd = IKM()
-        kbd.add(IKB(text='Отправить', callback_data='order_confirm'))
-        kbd.add(IKB(text='Изменить данные', callback_data='cart_confirm_change'))
-        BOT.send_message(chat_id=pair.chat.id, text=txt, reply_markup=kbd)
+        kbd.add(IKB(text='Отправить', callback_data='order_id_confirm_takeaway_on_time_address'))
+        cb_time = 'order_confirm_change_time_takeaway_address'
+        cb_phone = 'order_confirm_change_phone_takeaway_phone'
+        kbd.add(IKB(text='Изменить время', callback_data=cb_time))
+        kbd.add(IKB(text='Изменить телефон', callback_data=cb_phone))
+        try:
+            BOT.send_message(chat_id=pair.chat.id, text=txt, reply_markup=kbd)
+        except Exception as err:
+            print(err)
 
     def order_triple_actions():
         order = Order.query.filter_by(id=int(data[1])).first()

@@ -597,7 +597,7 @@ def webapp_data():
         db.session.commit()
         del cart
         BOT.send_message(chat_id=rest.service_uid, text=text, reply_markup=kbd, parse_mode='HTML')
-        send_email(rest.email, f'Поступил заказ из Robofood № {new_order.id}', text)
+        # send_email(rest.email, f'Поступил заказ из Robofood № {new_order.id}', text)
         return 'Ok', 200
 
 

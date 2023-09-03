@@ -11,6 +11,9 @@
 <link rel="stylesheet" href="/static/webapp.css">
 </head>
 <body>
+  <div id="loader" style="display:none; text-align: center; position: absolute; top: 10%; left: 40%;">
+    <img src="/static/loader.gif" style="width:64px;height:64px;">
+  </div>
   <div id="main">
     <div class="nav-bar fixed-top">
       {% for category in categories %}
@@ -94,6 +97,15 @@
     catch (err) {
       uid = 113737020;
     }
+    function syncDelay(milliseconds){
+      var start = new Date().getTime();
+      var end = 0;
+
+      while((end - start) < milliseconds){
+        end = new Date().getTime();
+      }
+    }
+
     var hasBeenClicked = false;
     document.getElementById("hiddenUid").innerHTML = uid;
     let dishId = $("#hiddenMainDishId").text()
@@ -135,6 +147,10 @@
       $("#hiddenCurrentDishId").html(itemId);
       if (!hasBeenClicked) {
         hasBeenClicked = true;
+        $("#main").hide();
+        $("#mainButton").hide();
+        document.getElementById("loader").style.display = "block";
+        syncDelay(500);
         fetch("/webapp_item?" + new URLSearchParams({uid: uid, item: itemId, category: category}))
         .then(function (response) { return response.json(); })
         .then(function (json) {
@@ -143,7 +159,8 @@
           let cost = 0;
           let quantity = 0;
           let count = 0;
-          $("#main").hide();
+          document.getElementById("loader").style.display = "none";
+          $("#mainButton").show();
           $("#dishItem").css("display", "block");
           let flexDiv = document.createElement('div');
           flexDiv.id = "dish-id-" + item.dishId;
@@ -284,12 +301,16 @@
     let rest_id = $("#wrapper").attr("class").split(" ")[1].split("_")[1]
     function mainButtonFunc(){
       if (document.getElementById("mainButton").innerHTML.indexOf("Корзина") !== -1) {
+        document.getElementById("main").style.display = "none";
+        document.getElementById("mainButton").style.display = "none";
+        document.getElementById("mainButton").innerHTML = "Продолжить";
+        document.getElementById("loader").style.display = "block";
         fetch("/webapp_cart?" + new URLSearchParams({uid: uid, restId: rest_id}))
         .then(function (response) { return response.json(); })
         .then(function (json) {
           var data = JSON.stringify(json);
-          document.getElementById("main").style.display = "none";
-          document.getElementById("mainButton").innerHTML = "Продолжить";
+          document.getElementById("loader").style.display = "none";
+          document.getElementById("mainButton").style.display = "block";
           document.getElementById("cart").style.display = "block";
           let items = JSON.parse(data);
           var cart = document.getElementById("cart");
@@ -436,15 +457,19 @@
         tg.BackButton.show();
       } else if (document.getElementById("mainButton").innerHTML === "Продолжить") {
         document.getElementById("cart").style.display = "none";
+        document.getElementById("mainButton").style.display = "none";
+        document.getElementById("loader").style.display = "block";
         document.getElementById("mainButton").innerHTML = "Оформить заказ";
-        document.getElementById("final").style.display = "block";
         fetch("/webapp_confirm?" + new URLSearchParams({uid: uid}))
         .then(function (response) { return response.json(); })
         .then(function (json) {
+          document.getElementById("loader").style.display = "none";
+          document.getElementById("final").style.display = "block";
+          document.getElementById("mainButton").style.display = "block";
           var data = JSON.stringify(json);
           let items = JSON.parse(data);
           var final = document.getElementById("final");
-          
+
           let finalWrapDiv = document.createElement('div');
           finalWrapDiv.id = "finalWrap";
           let newP1 = document.createElement('p');
@@ -514,7 +539,7 @@
           finalWrapDiv.appendChild(div2);
 
           let newP3 = document.createElement('p');
-          newP3.innerHTML = "Информация";
+          newP3.innerHTML = "Информация. Тапните сюда чтобы убрать клавиатуру";
           newP3.onclick = function() {
             document.activeElement.blur();
           };
@@ -592,6 +617,11 @@
             alert("Для оформления требуется указать номер телефона");
           }
         } else {
+          document.getElementById("final").style.display = "none";
+          document.getElementById("mainButton").style.display = "none";
+          document.getElementById("loader").style.display = "block";
+          tg.BackButton.hide();
+          syncDelay(1000);
           let userTotal = $("#div-total").text();
           $("#input-phone").on("input", function() {
             userPhone = $(this).val();
@@ -599,22 +629,36 @@
           $("#input-address").on("input", function() {
             userAddress = $(this).val();
           });
-          const xhr = new XMLHttpRequest();
-          xhr.open("GET", "/webapp/data?" + new URLSearchParams({
-            uid: uid,
-            method: orderType,
-            payment: paymentMethod,
-            phone: userPhone,
-            address: userAddress,
-            total: userTotal,
-            comment: userComment
-          }));
-          xhr.send();
-          tg.close();
+          var params = {
+            "uid": uid,
+            "method": orderType,
+            "payment": paymentMethod,
+            "phone": userPhone,
+            "address": userAddress,
+            "total": userTotal,
+            "comment": userComment
+          };
+          try {
+            fetch("/webapp/data?" + new URLSearchParams(params), {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/x-www-form-urlencoded;charset=UTF-8'
+              },
+            });
+          } catch (error) {
+            console.log('caught it!', err);
+          }
         }
+        syncDelay(1000);
+        tg.close();
       } else if (document.getElementById("mainButton").innerHTML.indexOf("Добавить") !== -1) {
         let subtotal = $("#hiddenTotal").html();
         let dishId = $("#hiddenCurrentDishId").html();
+        $("#mainFooter").hide();
+        $("#dishItem").hide();
+        $(".flex-dishItem-container").remove();
+        document.getElementById("loader").style.display = "block";
+        syncDelay(500);
         fetch("/webapp/data", {
           method: 'post',
           headers: {
@@ -626,6 +670,7 @@
         .then(function (json) {
           var data = JSON.stringify(json);
           let items = JSON.parse(data);
+          document.getElementById("loader").style.display = "none";
           $("#hiddenTotal").html(items.total);
           $("#mainFooter").css("display", "block");
           $("#mainButton").show();
@@ -633,9 +678,6 @@
           $("#mainButton").css("flex-shrink", "");
           $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
           $("#item-btn-dish-id").remove();
-<!--          $("div[id^='dish-']").remove();-->
-          $("#dishItem").hide();
-          $(".flex-dishItem-container").remove();
           $("#main").show();
           tg.BackButton.hide();
           $("#itemCard-" + items.dish_id).css("border-bottom", "thick double #0275D8");
@@ -657,25 +699,29 @@
     $('#divTerms')
       .click(
         function(){
-          tg.BackButton.show();
           $("#mainButton").css('visibility', 'hidden');
           $("#main").hide();
+          document.getElementById("loader").style.display = "block";
+          syncDelay(500);
+          tg.BackButton.show();
+          document.getElementById("loader").style.display = "none";
           $("#restTerms").show();
         }
       );
     if ($("#hiddenTermsViewFlag").text() === 'True') {
-      tg.BackButton.show();
       $("#mainButton").css('visibility', 'hidden');
       $("#main").hide();
+      document.getElementById("loader").style.display = "block";
+      syncDelay(500);
+      document.getElementById("loader").style.display = "none";
+      tg.BackButton.show();
       $("#restTerms").show();
     }
     Telegram.WebApp.onEvent('backButtonClicked', function(){
       if (window.getComputedStyle(document.getElementById("cart")).display !== "none") {
         tg.BackButton.hide();
-        $("#main").show();
-        $("#mainButton").html("Корзина");
-        $("#mainButton").show();
         $("#cart").hide();
+        $("#mainButton").hide();
         let subtotal = $("#hiddenTotal").html();
         try {
           $("#emptyCart").remove();
@@ -688,6 +734,12 @@
         } catch(e) {
           console.log(e);
         }
+        document.getElementById("loader").style.display = "block";
+        syncDelay(500);
+        document.getElementById("loader").style.display = "none";
+        $("#main").show();
+        $("#mainButton").html("Корзина");
+        $("#mainButton").show();
         if (subtotal != 0) {
           $("#mainButton").html("Корзина " + $("#hiddenTotal").html() + " ₽");
           let scrollDiv = document.getElementById("itemCard-" + dishId).offsetTop;
@@ -697,11 +749,18 @@
       } else if (window.getComputedStyle(document.getElementById("final")).display !== "none") {
         tg.BackButton.show();
         $("#finalWrap").remove();
+        $("#mainButton").hide();
+        document.getElementById("loader").style.display = "block";
+        syncDelay(500);
+        document.getElementById("loader").style.display = "none";
         $("#cart").show();
         $("#mainButton").html("Продолжить");
       } else if (window.getComputedStyle(document.getElementById("restTerms")).display !== "none") {
         tg.BackButton.hide();
         $("#restTerms").hide();
+        document.getElementById("loader").style.display = "block";
+        syncDelay(500);
+        document.getElementById("loader").style.display = "none";
         $("#main").show();
         $("#mainButton").css('visibility', 'visible');
         if ($('.elements[style*="display: flex"]').attr('id')) {
@@ -717,6 +776,10 @@
         $(".flex-dishItem-container").remove();
         $("#dishItem").hide();
         $("#item-btn-dish-id").remove();
+        $("#mainButton").hide();
+        document.getElementById("loader").style.display = "block";
+        syncDelay(500);
+        document.getElementById("loader").style.display = "none";
         $("#mainFooter").css("display", "block");
         $("#mainButton").show();
         $("#mainButton").css("width", "95%");
