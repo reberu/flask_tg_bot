@@ -22,7 +22,7 @@ from forms import LoginForm, DishForm, CategoryForm, DishDeleteForm, RestaurantF
     RestaurantDeliveryTermsEditForm, SubcategoryForm, SpecialDishForm, PromoDishForm, PromoDishDeleteForm, \
     SpecialDishDeleteForm, DishEditForm, SubcategoryDeleteForm, SearchWordForm, SearchDishForm, SearchDishDelForm, \
     SearchWordDelForm, DateForm, RestaurantsEnableForm, RestaurantInfoForm
-from settings import BOT, BASE_URL, SET_WEBHOOK, YKT, ADMINS
+from settings import BOT, BASE_URL, SET_WEBHOOK, DELETE_WEBHOOK, YKT, ADMINS
 from static.contract import contract_text
 
 import re
@@ -41,6 +41,7 @@ from werkzeug.utils import secure_filename
 
 from transliterate import translit
 
+requests.get(DELETE_WEBHOOK)
 requests.get(SET_WEBHOOK)
 
 
@@ -124,6 +125,7 @@ def webhook():
         update = Update.de_json(request.stream.read().decode('utf-8'))
         BOT.process_new_updates([update])
         check_user(update.message.json)
+        write_history(update.message.json['message_id'], update.message.json['chat']['id'], update.message.json['text'], is_bot=False)
     except Exception as e:
         print("app route / error: ", e)
     return 'Ok', 200
@@ -830,6 +832,7 @@ def admin():
 
     if dish_edit_form.dish_edit_submit.data:
         if dish_edit_form.validate_on_submit() or dish_edit_form.is_submitted():
+            print('DISH EDIT')
             id_dish = dish_edit_form.id_dish.data
             name = dish_edit_form.name.data
             cost = dish_edit_form.cost.data
@@ -852,15 +855,16 @@ def admin():
                 print(e)
             try:
                 dish = Dish.query.filter_by(id=id_dish).first()
-                search_dish = SearchDishes.query.filter_by(dish_id=id_dish).first()
                 dish.name = name
-                search_dish.dish_name = name
                 dish.id_rest = id_rest
-                search_dish.rest_id = id_rest
                 dish.cost = cost
                 dish.composition = composition
                 dish.category = category
-                search_dish.dish_category = category
+                search_dish = SearchDishes.query.filter_by(dish_id=id_dish).first()
+                if search_dish:
+                    search_dish.dish_name = name
+                    search_dish.rest_id = id_rest
+                    search_dish.dish_category = category
                 img_link = None
                 if file_flag:
                     dish.img_link = img_link
