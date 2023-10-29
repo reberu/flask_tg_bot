@@ -1155,6 +1155,14 @@ def admin():
     if admin_add_form.admin_add_button.data:
         if admin_add_form.validate_on_submit() or admin_add_form.is_submitted():
             username = admin_add_form.username.data
+            check = Admin.query.filter_by(username=username).first()
+            if check:
+                flash('Такой пользователь уже есть', category='error')
+                return redirect(url_for('admin'))
+            check = re.search(r'^[a-zA-Z0-9_]*$', username)
+            if not check:
+                flash('Пользователь не добавлен. Логин не должен содержать пробелы и спецсимволы', category='error')
+                return redirect(url_for('admin'))
             passwd = admin_add_form.passwd.data
             mail = admin_add_form.email.data
             ownership = request.form['admin_add_rest_selector']

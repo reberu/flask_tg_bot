@@ -2,7 +2,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
 from wtforms import StringField, SubmitField, BooleanField, PasswordField, IntegerField, HiddenField, widgets, \
     SelectField, TextField
-from wtforms.validators import DataRequired, Email
+from wtforms.validators import DataRequired, Email, Regexp
 from app import db
 from models import *
 
@@ -175,7 +175,7 @@ class CategoryDeleteForm(FlaskForm):
 
 
 class AdminAddForm(FlaskForm):
-    username = StringField("Логин", validators=[DataRequired()])
+    username = StringField("Логин", validators=[DataRequired(), Regexp(r"^[a-zA-Z0-9_]*$")])
     passwd = StringField("Пароль", validators=[DataRequired()])
     email = StringField("Почта", validators=[DataRequired()])
     ownership = StringField("Наименование ресторана")
