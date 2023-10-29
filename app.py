@@ -2,29 +2,31 @@ from flask import Flask
 from flask_script import Manager
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from settings import Config
+from settings import Config, SMTP_USER, SMTP_PASSWORD
 from apscheduler.schedulers.background import BackgroundScheduler
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-def send_email(host, subject, text):
-    smtp_server = "smtp.office365.com"
-    user = "robofood1bot@outlook.com"
-    pswd = "Gps888Rcb"
-    port = 587
+def send_email(host, subject, body):
+    smtp_server = "smtp.yandex.ru"
+    imap_server = "imap.yandex.ru"
+    port = 465
     msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['From'] = user
+    msg['From'] = SMTP_USER
     msg['To'] = host
-    msg.attach(MIMEText(text, 'plain'))
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+    text = msg.as_string()
     try:
-        with smtplib.SMTP(smtp_server, port) as server:
-            server.starttls()
-            server.login(user, pswd)
-            server.send_message(msg)
-            server.quit()
+        smtp = smtplib.SMTP_SSL(host=smtp_server, port=port)
+        smtp.ehlo(SMTP_USER)
+        smtp.login(SMTP_USER, SMTP_PASSWORD)
+        smtp.auth_plain()
+        smtp.sendmail(from_addr=SMTP_USER, to_addrs=host, msg=text)
+        smtp.sendmail(from_addr=SMTP_USER, to_addrs=SMTP_USER, msg=text)
+        smtp.quit()
     except Exception as e:
         print('oops: ', e)
 
